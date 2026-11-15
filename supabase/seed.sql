@@ -121,3 +121,25 @@ insert into public.credenciales (id, usuario_id, emisor_id, tipo_beneficiario, v
   ('10000000-0000-4000-8000-000000000002', 'b0000000-0000-4000-8000-000000000002', 'uttab',  'estudiante',   'f0000000-0000-4000-8000-000000000002', '2027-01-01T05:59:59Z'),
   ('10000000-0000-4000-8000-000000000003', 'b0000000-0000-4000-8000-000000000003', 'inapam', 'adulto_mayor', 'f0000000-0000-4000-8000-000000000003', '2027-01-01T05:59:59Z')
 on conflict (id) do nothing;
+
+-- ---------- Un solo negocio en la demo ----------
+-- Pey solo tiene activa la cuenta CoDi de Ramón Orraca (ligada a la API key): todos los cobros caen ahí.
+-- La demo usa un único negocio con los 3 convenios; los otros comercios quedan inactivos (historial).
+update public.comercios
+   set nombre = 'Negocio de Ramón Orraca', giro = 'Comercio demo',
+       direccion = 'Cobros CoDi a la cuenta de Ramón Orraca (CLABE ••••5713)'
+ where id = 'a0000000-0000-4000-8000-000000000001';
+update public.perfiles set nombre = 'Negocio de Ramón Orraca' where id = 'd0000000-0000-4000-8000-000000000001';
+update public.comercios set activo = false
+ where id in ('a0000000-0000-4000-8000-000000000002', 'a0000000-0000-4000-8000-000000000003');
+update auth.users set raw_app_meta_data = raw_app_meta_data - 'demo'
+ where id in ('d0000000-0000-4000-8000-000000000002', 'd0000000-0000-4000-8000-000000000003');
+insert into public.comercio_convenios (comercio_id, convenio_id) values
+  ('a0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000002'),
+  ('a0000000-0000-4000-8000-000000000001', 'c0000000-0000-4000-8000-000000000003')
+on conflict do nothing;
+insert into public.productos (comercio_id, sku, nombre, precio_centavos) values
+  ('a0000000-0000-4000-8000-000000000001', 'CAFE-AME', 'Café americano', 3500),
+  ('a0000000-0000-4000-8000-000000000001', 'CAFE-LAT', 'Café latte', 4800),
+  ('a0000000-0000-4000-8000-000000000001', 'AGUA-500', 'Agua 500 ml', 1500)
+on conflict (comercio_id, sku) do nothing;

@@ -99,22 +99,35 @@ interface OpcionDescuento {
   calculo: ResultadoDescuento;
 }
 
-/** Credenciales del usuario que aplican en ese comercio, con su descuento (mejor primero). */
+/** Fecha de hoy en CDMX (YYYY-MM-DD) para comparar vigencias de convenios. */
+function hoyCdmx() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(new Date());
+}
+
+/**
+ * Credenciales del usuario que aplican en ese comercio. Si una credencial tiene varios convenios
+ * en el mismo comercio (p. ej. 10 % general y 20 % en café), se aplica el que más le ahorra.
+ * Resultado ordenado: mejor descuento primero.
+ */
 async function opcionesDescuento(usuarioId: string, s: SolicitudCobro): Promise<OpcionDescuento[]> {
   const { repo } = ctx();
-  const creds = (await repo.credencialesDeUsuario(usuarioId)).filter(
-    (c) => c.estado === "activa" && c.vigente_hasta.getTime() > Date.now(),
-  );
+  const hoy = hoyCdmx();
+  const [creds, conveniosComercio] = await Promise.all([
+    repo.credencialesDeUsuario(usuarioId),
+    repo.conveniosDeComercio(s.comercio_id),
+  ]);
+  const vigentes = conveniosComercio.filter((c) => c.vigente_desde <= hoy && (c.vigente_hasta === null || c.vigente_hasta >= hoy));
   const opciones: OpcionDescuento[] = [];
-  for (const credencial of creds) {
-    const convenio = await repo.buscarConvenio({
-      emisorId: credencial.emisor_id,
-      tipoBeneficiario: credencial.tipo_beneficiario,
-      comercioId: s.comercio_id,
-    });
-    if (!convenio) continue;
-    const usos = await repo.usosHoy(credencial.id, convenio.id);
-    opciones.push({ credencial, convenio, calculo: calcularDescuento({ regla: convenio.regla, compra: s.compra, usos_hoy: usos }) });
+  for (const credencial of creds.filter((c) => c.estado === "activa" && c.vigente_hasta.getTime() > Date.now())) {
+    let mejor: OpcionDescuento | null = null;
+    for (const convenio of vigentes.filter(
+      (c) => c.emisor_id === credencial.emisor_id && c.tipo_beneficiario === credencial.tipo_beneficiario,
+    )) {
+      const usos = await repo.usosHoy(credencial.id, convenio.id);
+      const calculo = calcularDescuento({ regla: convenio.regla, compra: s.compra, usos_hoy: usos });
+      if (!mejor || calculo.descuento_centavos > mejor.calculo.descuento_centavos) mejor = { credencial, convenio, calculo };
+    }
+    if (mejor) opciones.push(mejor);
   }
   return opciones.sort((a, b) => b.calculo.descuento_centavos - a.calculo.descuento_centavos);
 }

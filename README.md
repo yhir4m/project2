@@ -94,7 +94,7 @@ cloudflared tunnel --url http://localhost:3000
 
 ## Cómo probar con MODO_PRUEBA
 
-1. En `/` entra como **Comercio · Papelería El Cuaderno**. En otra ventana (privada) o en tu celular, entra como **Beneficiario · Ana**.
+1. En `/` entra como **Comercio · Negocio de Ramón Orraca** (el único negocio de la demo; sus cobros CoDi caen en la cuenta de Ramón Orraca, la única activa en Pey). En otra ventana (privada) o en tu celular, entra como **Beneficiario · Ana**.
 2. Comercio → **Cobrar**: captura $100 (o elige productos) → **Generar código de cobro**. Aparece el QR.
 3. Ana → **Pagar**: escanea el QR (en demo también puedes pegarlo). Ve el desglose: $100 − 10 % = **$90**.
 4. Si Ana no tiene celular, la app se lo pide (lo necesita CoDi). Luego **Pagar con CoDi**.
