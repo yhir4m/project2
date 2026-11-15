@@ -223,3 +223,35 @@ describe("PeyClient", () => {
     expect(f.mock.calls[1]![0]).toBe("https://api.pey.mx/transaction/api-key?nextToken=n1");
   });
 });
+
+describe("PeySimulado", () => {
+  it("autorizar envía un webhook firmado que pasa la verificación real", async () => {
+    const { PeySimulado } = await import("./simulado");
+    let recibido: ReturnType<typeof verificarWebhook> | null = null;
+    const sim = new PeySimulado(SECRETO, async (body, headers) => {
+      recibido = verificarWebhook(body, headers, SECRETO);
+    });
+    const r = await sim.crearPushNotification({
+      amount: 0.1,
+      phoneNumber: "9931234567",
+      metadata: { txId: "tx-1" },
+    });
+    expect((await sim.obtenerTransaccion(r.transactionId)).status).toBe("PENDING");
+    await sim.autorizar({ transactionId: r.transactionId });
+    expect(recibido).toMatchObject({
+      ok: true,
+      evento: { type: "codi.pn.payment_received", transactionId: r.transactionId },
+    });
+    const tx = await sim.obtenerTransaccion(r.transactionId);
+    expect(confirmarPago(tx, { montoCentavos: 10, txId: "tx-1", canal: "pn" })).toEqual({
+      ok: true,
+      montoCentavos: 10,
+    });
+  });
+
+  it("valida igual que Pey", async () => {
+    const { PeySimulado } = await import("./simulado");
+    const sim = new PeySimulado(SECRETO, async () => {});
+    await expect(sim.crearPushNotification({ amount: 1, phoneNumber: "12" })).rejects.toThrow();
+  });
+});
