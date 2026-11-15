@@ -36,7 +36,7 @@ export async function jwsDeCredencial(c: Credencial): Promise<string> {
  * Emite un QR dinámico (45 s) para la credencial del usuario autenticado.
  * Liga la credencial al primer dispositivo que la usa (hash del id de dispositivo).
  */
-export async function emitirQr(usuarioId: string, credencialId: string, dispositivoId: string) {
+export async function emitirQr(usuarioId: string, credencialId: string, dispositivoId: string, revincular = false) {
   const { repo } = ctx();
   const c = await repo.credencial(credencialId);
   if (!c || c.usuario_id !== usuarioId) throw new ErrorHttp(404, "credencial_no_encontrada", "No encontramos tu credencial.");
@@ -46,10 +46,11 @@ export async function emitirQr(usuarioId: string, credencialId: string, disposit
   }
 
   const dispositivoHash = await sha256Base64url(`cdv-dev:${dispositivoId}`);
-  if (!c.dispositivo_hash) {
+  if (!c.dispositivo_hash || (revincular && c.dispositivo_hash !== dispositivoHash)) {
+    // revincular solo llega aquí en DEMO_MODE (lo filtra la ruta). En producción, un teléfono nuevo = verificarse de nuevo.
     await repo.actualizarCredencial(c.id, { dispositivo_hash: dispositivoHash });
   } else if (c.dispositivo_hash !== dispositivoHash) {
-    throw new ErrorHttp(409, "otro_dispositivo", "Esta credencial está ligada a otro teléfono.");
+    throw new ErrorHttp(409, "otro_dispositivo", "Esta credencial está ligada a otro teléfono. Verifícate de nuevo en este teléfono.");
   }
 
   const { privada } = await llavesEmisor(c.emisor_id);

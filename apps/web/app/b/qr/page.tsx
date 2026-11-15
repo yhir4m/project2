@@ -12,6 +12,7 @@ import { Cargando, ErrorEstado, Vacio } from "@/components/estados";
 import { Button } from "@/components/ui/button";
 import { useCredenciales } from "@/hooks/use-credenciales";
 import { idDispositivo } from "@/hooks/use-dispositivo";
+import { useYo } from "@/hooks/use-yo";
 import { api, ErrorApi } from "@/lib/api";
 
 const TTL = 45;
@@ -32,14 +33,16 @@ function MiQr() {
   const credId = params.get("c") ?? activas[0]?.id;
   const cred = activas.find((c) => c.id === credId);
   const [desde] = useState(() => Date.now());
+  const [revincular, setRevincular] = useState(false);
+  const yo = useYo();
 
   const qr = useQuery({
-    queryKey: ["qr", credId],
+    queryKey: ["qr", credId, revincular],
     enabled: Boolean(cred),
     queryFn: () =>
       api<{ token: string; expira_en: string }>("/api/b/qr", {
         method: "POST",
-        json: { credencialId: credId, dispositivoId: idDispositivo() },
+        json: { credencialId: credId, dispositivoId: idDispositivo(), ...(revincular ? { revincular: true } : {}) },
       }),
     // Rotación automática: se pide uno nuevo antes de que expire.
     refetchInterval: (q) => (q.state.data ? Math.max(1000, new Date(q.state.data.expira_en).getTime() - Date.now() - 4000) : false),
@@ -86,10 +89,17 @@ function MiQr() {
       <Encabezado titulo="Mi QR" subtitulo={`${cred.emisor_corto} · muéstralo al pagar`} atras="/b" />
       <Contenido className="flex flex-col items-center">
         {qr.isError ? (
-          <ErrorEstado
-            mensaje={qr.error instanceof ErrorApi ? qr.error.message : "No pudimos generar tu código."}
-            reintentar={() => qr.refetch()}
-          />
+          <div className="w-full space-y-3">
+            <ErrorEstado
+              mensaje={qr.error instanceof ErrorApi ? qr.error.message : "No pudimos generar tu código."}
+              reintentar={() => qr.refetch()}
+            />
+            {qr.error instanceof ErrorApi && qr.error.codigo === "otro_dispositivo" && yo.data?.app.demo ? (
+              <Button variant="secundario" onClick={() => setRevincular(true)}>
+                Demo: usar mi credencial en este teléfono
+              </Button>
+            ) : null}
+          </div>
         ) : !qr.data ? (
           <Cargando texto="Generando tu código…" />
         ) : (
