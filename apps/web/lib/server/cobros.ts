@@ -75,7 +75,14 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 async function productoDesdeQr(contenido: string) {
   const raw = contenido.trim();
   const id = raw.match(/\/pagar\/p\/([0-9a-f-]{36})/i)?.[1] ?? (raw.length === 36 && UUID.test(raw) ? raw : null);
-  if (!id) throw new ErrorHttp(422, "no_es_cobro", "Este no es un código de cobro de un negocio afiliado.");
+  if (!id) {
+    // Diagnóstico en los logs (sin datos personales: es el texto del QR escaneado).
+    console.warn("[qr] contenido no reconocido:", JSON.stringify(raw.slice(0, 120)));
+    if (/\/pagar\/[0-9a-f-]{36}/i.test(raw) || raw.startsWith("CDVC1.")) {
+      throw new ErrorHttp(422, "qr_anterior", "Este QR es de una versión anterior. Escanea un QR de “Mis QR” del negocio.");
+    }
+    throw new ErrorHttp(422, "no_es_cobro", "Este no es un código de cobro de un negocio afiliado.");
+  }
   const { repo } = ctx();
   const producto = await repo.producto(id);
   const comercio = producto ? await repo.comercio(producto.comercio_id) : null;
