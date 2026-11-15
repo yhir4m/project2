@@ -1,6 +1,6 @@
 "use client";
 
-import { CameraOff, ClipboardPaste } from "lucide-react";
+import { Camera, CameraOff, ClipboardPaste } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,7 @@ export function Escaner({
 
     async function iniciar() {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError("Este navegador no permite usar la cámara. Usa HTTPS o un navegador actualizado.");
+        setError(window.isSecureContext ? "Este navegador no permite usar la cámara en vivo." : "La cámara en vivo solo funciona si abres la app con https://.");
         return;
       }
       try {
@@ -115,12 +115,14 @@ export function Escaner({
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80 p-6 text-center text-white">
             <CameraOff className="size-12" aria-hidden />
             <p className="text-lg font-semibold">{error}</p>
+            <p className="text-base">Usa el botón “Tomar foto del código”.</p>
           </div>
         ) : null}
         <p className="absolute inset-x-0 bottom-3 text-center text-base font-semibold text-white drop-shadow">
           {indicacion}
         </p>
       </div>
+      <FotoDelCodigo onLeer={onLeer} destacado={Boolean(error)} />
       {permitirPegar ? (
         <form
           className="flex gap-2"
@@ -136,6 +138,69 @@ export function Escaner({
           </Button>
         </form>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Respaldo sin cámara en vivo: abre la cámara nativa del teléfono (input file con `capture`),
+ * que funciona aunque el navegador bloquee getUserMedia (http, navegadores dentro de otras apps),
+ * y decodifica el QR de la foto.
+ */
+function FotoDelCodigo({ onLeer, destacado }: { onLeer: (texto: string) => void; destacado: boolean }) {
+  const [leyendo, setLeyendo] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  async function leerFoto(archivo: File) {
+    setLeyendo(true);
+    setAviso(null);
+    const url = URL.createObjectURL(archivo);
+    try {
+      let texto: string | null = null;
+      const BD = (globalThis as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (i: ImageBitmapSource) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+      if (BD) {
+        try {
+          const [c] = await new BD({ formats: ["qr_code"] }).detect(await createImageBitmap(archivo));
+          texto = c?.rawValue ?? null;
+        } catch {}
+      }
+      if (!texto) {
+        const { BrowserQRCodeReader } = await import("@zxing/browser");
+        texto = (await new BrowserQRCodeReader().decodeFromImageUrl(url)).getText();
+      }
+      navigator.vibrate?.(60);
+      onLeer(texto);
+    } catch {
+      setAviso("No encontramos un código en la foto. Acércate y que salga completo y enfocado.");
+    } finally {
+      URL.revokeObjectURL(url);
+      setLeyendo(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <label
+        className={`flex min-h-14 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-5 text-lg font-semibold ${
+          destacado ? "bg-primario text-primario-texto" : "border-2 border-borde bg-superficie text-texto"
+        } ${leyendo ? "opacity-60" : ""}`}
+      >
+        <Camera className="size-6" aria-hidden />
+        {leyendo ? "Leyendo foto…" : "Tomar foto del código"}
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          disabled={leyendo}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) void leerFoto(f);
+          }}
+        />
+      </label>
+      {aviso ? <p role="alert" className="text-center text-sm font-semibold text-error">{aviso}</p> : null}
     </div>
   );
 }
