@@ -1,0 +1,4 @@
+pnpm-lock.yaml
+docs/reference/
+packages/db/src/database.types.ts
+.next/

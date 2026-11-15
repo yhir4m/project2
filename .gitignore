@@ -1,0 +1,27 @@
+node_modules/
+.pnpm-store/
+.turbo/
+.next/
+out/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+.DS_Store
+.vercel/
+
+# secretos
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# serwist
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker-*.js
+
+# supabase local
+supabase/.branches
+supabase/.temp
