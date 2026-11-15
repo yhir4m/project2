@@ -1,7 +1,7 @@
 /**
- * Filas de la base de datos. Reflejan 1:1 las tablas de `supabase/migrations`.
- * Cuando se conecte Supabase se reemplazan por los tipos generados (`supabase gen types`).
- * Fechas como `Date`; dinero en centavos enteros.
+ * Modelo de dominio de las filas de Supabase (ver `database.types.ts`, generado).
+ * Diferencias con la fila cruda: fechas como `Date` y `regla`/`compra` tipadas.
+ * Dinero en centavos enteros.
  */
 import type { Compra, ReglaConvenio, TipoPeriodo } from "@cdv/core";
 
@@ -70,7 +70,6 @@ export interface Producto {
 
 export interface Perfil {
   id: string;
-  email: string; // vive en auth.users; se incluye aquí por comodidad del mock
   rol: RolUsuario;
   nombre: string | null;
   celular: string | null;

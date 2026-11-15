@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+/* Tokens (espejo de @cdv/ui). Tipografía base 18 px; modo letra grande sube toda la escala. */
+:root {
+  --fondo: #f7f7f4;
+  --superficie: #ffffff;
+  --texto: #14171a;
+  --texto-suave: #4a5260;
+  --borde: #d5d9df;
+  --primario: #0b5fff;
+  --primario-texto: #ffffff;
+  --exito: #0a7a3b;
+  --exito-fondo: #e5f5ec;
+  --error: #b42318;
+  --error-fondo: #fdecea;
+  --aviso: #8a5300;
+  --aviso-fondo: #fff4db;
+
+  --fs-xs: 15px;
+  --fs-sm: 16px;
+  --fs-base: 18px;
+  --fs-lg: 21px;
+  --fs-xl: 24px;
+  --fs-2xl: 30px;
+  --fs-3xl: 38px;
+
+  --alto-nav: 72px;
+  --alto-header: 60px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fondo: #0e1116;
+    --superficie: #171b22;
+    --texto: #f2f4f7;
+    --texto-suave: #b4bcc8;
+    --borde: #2c333d;
+    --primario: #5b93ff;
+    --primario-texto: #0e1116;
+    --exito: #3dd68c;
+    --exito-fondo: #0f2a1c;
+    --error: #ff8a80;
+    --error-fondo: #3a1512;
+    --aviso: #ffc861;
+    --aviso-fondo: #332508;
+    color-scheme: dark;
+  }
+}
+
+:root[data-letra="grande"] {
+  --fs-xs: 18px;
+  --fs-sm: 20px;
+  --fs-base: 22px;
+  --fs-lg: 26px;
+  --fs-xl: 30px;
+  --fs-2xl: 36px;
+  --fs-3xl: 46px;
+  --alto-nav: 84px;
+}
+
+@theme inline {
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-borde: var(--borde);
+  --color-primario: var(--primario);
+  --color-primario-texto: var(--primario-texto);
+  --color-exito: var(--exito);
+  --color-exito-fondo: var(--exito-fondo);
+  --color-error: var(--error);
+  --color-error-fondo: var(--error-fondo);
+  --color-aviso: var(--aviso);
+  --color-aviso-fondo: var(--aviso-fondo);
+
+  --text-xs: var(--fs-xs);
+  --text-sm: var(--fs-sm);
+  --text-base: var(--fs-base);
+  --text-lg: var(--fs-lg);
+  --text-xl: var(--fs-xl);
+  --text-2xl: var(--fs-2xl);
+  --text-3xl: var(--fs-3xl);
+
+  --font-sans: var(--font-atkinson), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+}
+
+html {
+  font-size: var(--fs-base);
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--fondo);
+  color: var(--texto);
+  font-family: var(--font-sans);
+  line-height: 1.45;
+  overscroll-behavior-y: none;
+}
+
+/* En pantallas grandes la app se ve como un teléfono centrado. */
+@media (min-width: 640px) {
+  body {
+    background: color-mix(in oklab, var(--fondo) 80%, var(--texto) 20%);
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--primario);
+  outline-offset: 2px;
+}
+
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

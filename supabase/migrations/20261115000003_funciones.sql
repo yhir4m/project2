@@ -130,7 +130,7 @@ alter publication supabase_realtime add table public.notificaciones;
 
 -- ---------- Storage: documentos temporales (solo servidor) ----------
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('documentos', 'documentos', false, 5242880,
-        array['image/jpeg', 'image/png', 'image/webp', 'application/pdf'])
+values ('documentos', 'documentos', false, 8388608,
+        array['image/jpeg', 'image/png'])  -- xAI visión: solo JPG/PNG
 on conflict (id) do nothing;
 -- Sin políticas en storage.objects para este bucket: solo service_role sube, lee (URL firmada) y borra.
