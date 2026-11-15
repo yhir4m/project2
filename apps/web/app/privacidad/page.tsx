@@ -8,7 +8,7 @@ export default function Privacidad() {
     <main className="pt-safe pb-safe mx-auto max-w-md space-y-4 bg-fondo px-4 py-8 text-lg">
       <h1 className="text-2xl font-bold">Aviso de privacidad simplificado</h1>
       <p>
-        <strong>Responsable:</strong> el equipo de “Descuento Verificado” (proyecto de hackatón) es responsable del tratamiento de tus
+        <strong>Responsable:</strong> el equipo de “Descuento Verificado” es responsable del tratamiento de tus
         datos personales conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares.
       </p>
       <h2 className="text-xl font-bold">¿Para qué usamos tus datos?</h2>

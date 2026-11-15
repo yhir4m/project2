@@ -1,11 +1,10 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowLeft, FlaskConical, LogOut } from "lucide-react";
+import { ArrowLeft, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useYo } from "@/hooks/use-yo";
 import { cn } from "@/lib/utils";
 import { NavIcono, type NombreIcono } from "./nav-icono";
 
@@ -22,7 +21,6 @@ export function AppShell({ nav, children }: { nav: ItemNav[]; children: ReactNod
   const path = usePathname();
   return (
     <div className="relative mx-auto flex min-h-dvh max-w-md flex-col bg-fondo sm:my-0 sm:shadow-2xl">
-      <BannerModoPrueba />
       <main className="flex-1 pb-[calc(var(--alto-nav)+env(safe-area-inset-bottom)+16px)]">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -108,21 +106,6 @@ export function Encabezado({
         {accion}
       </div>
     </header>
-  );
-}
-
-function BannerModoPrueba() {
-  const { data } = useYo();
-  if (!data?.app.modo_prueba && !data?.app.pey_simulado) return null;
-  return (
-    <div role="note" className="pt-safe sticky top-0 z-40 bg-aviso-fondo text-aviso">
-      <p className="flex items-center justify-center gap-2 px-3 py-1.5 text-center text-sm font-bold">
-        <FlaskConical className="size-4 shrink-0" aria-hidden />
-        {data.app.pey_simulado
-          ? "Modo prueba · pagos simulados"
-          : `Modo prueba · se cobran $${data.app.monto_prueba.toFixed(2)} reales`}
-      </p>
-    </div>
   );
 }
 

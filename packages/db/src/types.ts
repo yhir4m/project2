@@ -120,8 +120,11 @@ export interface Transaccion {
   idempotency_key: string;
   solicitud_id: string | null;
   comercio_id: string;
-  credencial_id: string;
-  convenio_id: string;
+  /** Quien pagó (con o sin credencial). */
+  pagador_id: string | null;
+  /** Solo si hubo descuento por convenio; null = precio general. */
+  credencial_id: string | null;
+  convenio_id: string | null;
   compra: Compra;
   precio_original_centavos: number;
   descuento_centavos: number;

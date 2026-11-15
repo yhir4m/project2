@@ -183,7 +183,7 @@ export function Escaner({
             setManual("");
           }}
         >
-          <Input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Demo: pega el código" aria-label="Pegar código (demo)" className="min-h-12 text-base" />
+          <Input value={manual} onChange={(e) => setManual(e.target.value)} placeholder="Pega el código QR aquí" aria-label="Pegar código" className="min-h-12 text-base" />
           <Button type="submit" ancho="auto" size="icono" variant="secundario" aria-label="Validar código pegado">
             <ClipboardPaste />
           </Button>

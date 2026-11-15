@@ -38,7 +38,7 @@ export function ElegirPagador({ destino, demo }: { destino: string; demo: boolea
         <ScanLine className="size-8" aria-hidden />
       </div>
       <h1 className="text-3xl font-bold">Pagar con descuento</h1>
-      <p className="text-lg text-texto-suave">Elige con qué cuenta vas a pagar este cobro.</p>
+      <p className="text-lg text-texto-suave">Elige con qué cuenta vas a pagar. Si eres estudiante o INAPAM, tu descuento se aplica solo.</p>
       {demo ? (
         q.isLoading ? (
           <Cargando />

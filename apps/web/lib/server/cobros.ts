@@ -4,8 +4,6 @@ import {
   centavosAPesos,
   construirTicket,
   describirRegla,
-  leerCobro,
-  MENSAJES_ERROR_COBRO,
   montoACobrar,
   numRefDesdeId,
   pesosACentavos,
@@ -15,7 +13,7 @@ import {
   type ResultadoDescuento,
   type Ticket,
 } from "@cdv/core";
-import type { Convenio, Credencial, Perfil, SolicitudCobro, Transaccion } from "@cdv/db";
+import type { Convenio, Credencial, Perfil, Producto, Transaccion } from "@cdv/db";
 import { confirmarPago, PeyError, verificarWebhook, type TransaccionPey } from "@cdv/pey";
 import { ctx, registrarProcesadorWebhook } from "./contexto";
 import { validarCredencialParaPago } from "./credenciales";
@@ -26,32 +24,22 @@ import { ErrorHttp, type UsuarioSesion } from "./sesion";
 export const EXPIRACION_COBRO_SEG = 360;
 
 // ===========================================================================
-// 1. El COMERCIO genera la solicitud de cobro (QR en su pantalla)
+// 1. El COMERCIO configura sus QR fijos (un QR por producto/servicio con precio fijo)
 // ===========================================================================
 
-export async function crearSolicitud(comercioId: string, compra: Compra) {
-  const total = totalCompra(compra);
-  return ctx().repo.crearSolicitud({
-    comercio_id: comercioId,
-    compra,
-    total_centavos: total,
-    expira_en: new Date(Date.now() + COBRO_TTL_SEGUNDOS * 1000),
-  });
+/** Contenido del QR fijo de un producto: enlace corto que abre la pantalla de pago. */
+export function qrDeProducto(productoId: string, urlPublica: string): string {
+  return `${urlPublica.replace(/\/$/, "")}/pagar/p/${productoId}`;
 }
 
-/** Contenido del QR: un enlace corto que abre la pantalla de pago (lo lee cualquier cámara de celular). */
-export function qrDeSolicitud(s: SolicitudCobro, urlPublica: string): string | null {
-  if (s.estado !== "abierta" || s.expira_en.getTime() <= Date.now()) return null;
-  return `${urlPublica.replace(/\/$/, "")}/pagar/${s.id}`;
+export async function crearQr(comercioId: string, nombre: string, precioCentavos: number) {
+  const sku = `QR-${globalThis.crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+  return ctx().repo.crearProducto({ comercio_id: comercioId, sku, nombre, precio_centavos: precioCentavos });
 }
 
 export async function solicitudDeComercio(id: string, comercioId: string) {
   const s = await ctx().repo.solicitud(id);
   if (!s || s.comercio_id !== comercioId) throw new ErrorHttp(404, "no_encontrada", "No encontramos este cobro.");
-  // Expiración perezosa.
-  if (s.estado === "abierta" && s.expira_en.getTime() <= Date.now()) {
-    return (await ctx().repo.actualizarSolicitud(s.id, ["abierta"], { estado: "expirada" })) ?? s;
-  }
   return s;
 }
 
@@ -69,7 +57,7 @@ export async function cancelarSolicitud(id: string, comercioId: string) {
 export async function confirmarEfectivo(id: string, comercioId: string) {
   const { repo } = ctx();
   const s = await solicitudDeComercio(id, comercioId);
-  if (!s.transaccion_id) throw new ErrorHttp(409, "sin_cliente", "El cliente aún no ha escaneado el código.");
+  if (!s.transaccion_id) throw new ErrorHttp(409, "sin_cliente", "Este cobro no tiene pago.");
   const tx = await repo.transaccion(s.transaccion_id);
   if (!tx || tx.metodo !== "efectivo") throw new ErrorHttp(409, "no_es_efectivo", "Este cobro no es en efectivo.");
   const pagada = await repo.transicionarTransaccion(tx.id, ["pendiente"], { estado: "pagada", pagada_en: new Date() });
@@ -78,35 +66,30 @@ export async function confirmarEfectivo(id: string, comercioId: string) {
 }
 
 // ===========================================================================
-// 2. El CLIENTE escanea el QR del comercio
+// 2. Quien paga escanea el QR fijo: precio del QR → descuento según su perfil
 // ===========================================================================
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-/**
- * Acepta lo que lea cualquier lector: el enlace del QR (`https://…/pagar/<id>`), el id solo,
- * o el token firmado anterior (`CDVC1.…`). La seguridad no depende del QR: la solicitud se valida
- * en la base (abierta, vigente) y se toma una sola vez de forma atómica.
- */
-async function solicitudDesdeQr(contenido: string) {
+/** Acepta el enlace del QR (`https://…/pagar/p/<id>`) o solo el id del producto. */
+async function productoDesdeQr(contenido: string) {
   const raw = contenido.trim();
-  let id: string | null = null;
-  if (raw.startsWith("CDVC1.")) {
-    const r = await leerCobro(raw, ctx().verificacionKey);
-    if (!r.ok) throw new ErrorHttp(422, r.error, MENSAJES_ERROR_COBRO[r.error]);
-    id = r.claims.sid;
-  } else {
-    const m = raw.match(/\/pagar\/([0-9a-f-]{36})/i) ?? (UUID.test(raw) && raw.length === 36 ? [raw, raw] : null);
-    id = m?.[1] ?? null;
+  const id = raw.match(/\/pagar\/p\/([0-9a-f-]{36})/i)?.[1] ?? (raw.length === 36 && UUID.test(raw) ? raw : null);
+  if (!id) throw new ErrorHttp(422, "no_es_cobro", "Este no es un código de cobro de un negocio afiliado.");
+  const { repo } = ctx();
+  const producto = await repo.producto(id);
+  const comercio = producto ? await repo.comercio(producto.comercio_id) : null;
+  if (!producto || !producto.activo || !comercio || !comercio.activo) {
+    throw new ErrorHttp(404, "qr_inactivo", "Este código ya no está activo. Pide al negocio el código vigente.");
   }
-  if (!id) throw new ErrorHttp(422, "no_es_cobro", MENSAJES_ERROR_COBRO.no_es_cobro);
-  const s = await ctx().repo.solicitud(id);
-  if (!s) throw new ErrorHttp(404, "no_encontrada", "No encontramos este cobro. Pide al negocio un código nuevo.");
-  if (s.estado !== "abierta") {
-    throw new ErrorHttp(409, "solicitud_no_disponible", "Este cobro ya fue pagado o cancelado. Pide uno nuevo al negocio.");
-  }
-  if (s.expira_en.getTime() <= Date.now()) throw new ErrorHttp(410, "expirado", MENSAJES_ERROR_COBRO.expirado);
-  return s;
+  return { producto, comercio };
+}
+
+function compraDe(producto: Producto, cantidad: number): Compra {
+  return {
+    tipo: "productos",
+    items: [{ sku: producto.sku, nombre: producto.nombre, precio_centavos: producto.precio_centavos, cantidad }],
+  };
 }
 
 interface OpcionDescuento {
@@ -123,15 +106,12 @@ function hoyCdmx() {
 /**
  * Credenciales del usuario que aplican en ese comercio. Si una credencial tiene varios convenios
  * en el mismo comercio (p. ej. 10 % general y 20 % en café), se aplica el que más le ahorra.
- * Resultado ordenado: mejor descuento primero.
+ * Resultado ordenado: mejor descuento primero. Lista vacía = precio general.
  */
-async function opcionesDescuento(usuarioId: string, s: SolicitudCobro): Promise<OpcionDescuento[]> {
+async function opcionesDescuento(usuarioId: string, comercioId: string, compra: Compra): Promise<OpcionDescuento[]> {
   const { repo } = ctx();
   const hoy = hoyCdmx();
-  const [creds, conveniosComercio] = await Promise.all([
-    repo.credencialesDeUsuario(usuarioId),
-    repo.conveniosDeComercio(s.comercio_id),
-  ]);
+  const [creds, conveniosComercio] = await Promise.all([repo.credencialesDeUsuario(usuarioId), repo.conveniosDeComercio(comercioId)]);
   const vigentes = conveniosComercio.filter((c) => c.vigente_desde <= hoy && (c.vigente_hasta === null || c.vigente_hasta >= hoy));
   const opciones: OpcionDescuento[] = [];
   for (const credencial of creds.filter((c) => c.estado === "activa" && c.vigente_hasta.getTime() > Date.now())) {
@@ -140,7 +120,7 @@ async function opcionesDescuento(usuarioId: string, s: SolicitudCobro): Promise<
       (c) => c.emisor_id === credencial.emisor_id && c.tipo_beneficiario === credencial.tipo_beneficiario,
     )) {
       const usos = await repo.usosHoy(credencial.id, convenio.id);
-      const calculo = calcularDescuento({ regla: convenio.regla, compra: s.compra, usos_hoy: usos });
+      const calculo = calcularDescuento({ regla: convenio.regla, compra, usos_hoy: usos });
       if (!mejor || calculo.descuento_centavos > mejor.calculo.descuento_centavos) mejor = { credencial, convenio, calculo };
     }
     if (mejor) opciones.push(mejor);
@@ -148,20 +128,17 @@ async function opcionesDescuento(usuarioId: string, s: SolicitudCobro): Promise<
   return opciones.sort((a, b) => b.calculo.descuento_centavos - a.calculo.descuento_centavos);
 }
 
-/** Vista previa para el cliente: qué compra, cuánto descuento y cuánto pagará. Nada se cobra aún. */
-export async function previsualizarPago(u: UsuarioSesion, contenido: string) {
-  const s = await solicitudDesdeQr(contenido);
-  const comercio = await ctx().repo.comercio(s.comercio_id);
-  const opciones = await opcionesDescuento(u.id, s);
+/** Vista previa: producto y precio del QR, y lo que paga esta persona según su perfil. Nada se cobra aún. */
+export async function previsualizarPago(u: UsuarioSesion, contenido: string, cantidad: number) {
+  const { producto, comercio } = await productoDesdeQr(contenido);
+  const compra = compraDe(producto, cantidad);
+  const total = totalCompra(compra);
+  const opciones = await opcionesDescuento(u.id, comercio.id, compra);
   const emisores = new Map((await ctx().repo.emisores()).map((e) => [e.id, e.nombre_corto]));
   return {
-    solicitud: {
-      id: s.id,
-      comercio: comercio?.nombre ?? "Comercio",
-      compra: s.compra,
-      total_centavos: s.total_centavos,
-      expira_en: s.expira_en.toISOString(),
-    },
+    qr: { producto_id: producto.id, comercio: comercio.nombre, concepto: producto.nombre, precio_centavos: producto.precio_centavos },
+    cantidad,
+    total_centavos: total,
     opciones: opciones.map((o) => ({
       credencial_id: o.credencial.id,
       emisor: emisores.get(o.credencial.emisor_id) ?? o.credencial.emisor_id,
@@ -174,31 +151,62 @@ export async function previsualizarPago(u: UsuarioSesion, contenido: string) {
 }
 
 // ===========================================================================
-// 3. El CLIENTE confirma y paga
+// 3. Quien paga confirma: cada escaneo crea su propio cobro (el QR es reutilizable)
 // ===========================================================================
 
-export async function pagarSolicitud(
+export async function pagarDesdeQr(
   u: UsuarioSesion,
-  args: { contenido: string; credencialId: string; dispositivoId: string; metodo: "codi" | "efectivo"; revincular: boolean },
+  args: {
+    contenido: string;
+    cantidad: number;
+    credencialId: string | null;
+    dispositivoId: string;
+    metodo: "codi" | "efectivo";
+    revincular: boolean;
+  },
 ): Promise<Transaccion> {
   const { repo, pey } = ctx();
   const e = env();
-  const s = await solicitudDesdeQr(args.contenido);
+  const { producto, comercio } = await productoDesdeQr(args.contenido);
+  const compra = compraDe(producto, args.cantidad);
 
-  // Credencial: dueño, firma del emisor, revocación, vigencia y dispositivo.
-  const credencial = await validarCredencialParaPago(u.id, args.credencialId, args.dispositivoId, args.revincular);
-  const opcion = (await opcionesDescuento(u.id, s)).find((o) => o.credencial.id === credencial.id);
-  if (!opcion) throw new ErrorHttp(409, "sin_convenio", "Tu credencial no tiene convenio con este negocio.");
-  const { convenio, calculo } = opcion;
+  // Con credencial → descuento según su convenio (firma del emisor, revocación, dispositivo).
+  // Sin credencial → precio general.
+  let credencial: Credencial | null = null;
+  let convenio: Convenio | null = null;
+  let calculo: ResultadoDescuento;
+  if (args.credencialId) {
+    credencial = await validarCredencialParaPago(u.id, args.credencialId, args.dispositivoId, args.revincular);
+    const opcion = (await opcionesDescuento(u.id, comercio.id, compra)).find((o) => o.credencial.id === credencial!.id);
+    if (!opcion) throw new ErrorHttp(409, "sin_convenio", "Tu credencial no tiene convenio con este negocio.");
+    convenio = opcion.convenio;
+    calculo = opcion.calculo;
+  } else {
+    const total = totalCompra(compra);
+    calculo = {
+      precio_original_centavos: total,
+      base_elegible_centavos: 0,
+      descuento_centavos: 0,
+      monto_final_centavos: total,
+      aplicado: false,
+      tope_aplicado: false,
+    };
+  }
 
   if (args.metodo === "codi") {
     if (!u.celular) throw new ErrorHttp(412, "sin_celular", "Registra tu celular para pagar con CoDi.");
     if (calculo.monto_final_centavos === 0) throw new ErrorHttp(422, "monto_cero", "Con tu descuento el total es $0. Elige efectivo.");
   }
 
-  // Uso único: solo una persona puede tomar la solicitud.
-  const tomada = await repo.tomarSolicitud(s.id);
-  if (!tomada) throw new ErrorHttp(409, "solicitud_no_disponible", "Este cobro ya fue tomado o expiró. Pide uno nuevo al negocio.");
+  // Cada pago es un cobro nuevo y de un solo uso (registro para el comercio y el webhook).
+  const solicitud = await repo.crearSolicitud({
+    comercio_id: comercio.id,
+    compra,
+    total_centavos: calculo.precio_original_centavos,
+    expira_en: new Date(Date.now() + COBRO_TTL_SEGUNDOS * 1000),
+  });
+  const s = await repo.tomarSolicitud(solicitud.id);
+  if (!s) throw new ErrorHttp(409, "solicitud_no_disponible", "No se pudo iniciar el cobro. Intenta de nuevo.");
 
   const cobrado =
     args.metodo === "codi"
@@ -210,12 +218,13 @@ export async function pagarSolicitud(
       : calculo.monto_final_centavos;
 
   const { transaccion: tx } = await repo.crearTransaccion({
-    idempotency_key: `sol:${s.id}:${globalThis.crypto.randomUUID()}`,
+    idempotency_key: `sol:${s.id}`,
     solicitud_id: s.id,
-    comercio_id: s.comercio_id,
-    credencial_id: credencial.id,
-    convenio_id: convenio.id,
-    compra: s.compra,
+    comercio_id: comercio.id,
+    pagador_id: u.id,
+    credencial_id: credencial?.id ?? null,
+    convenio_id: convenio?.id ?? null,
+    compra,
     precio_original_centavos: calculo.precio_original_centavos,
     descuento_centavos: calculo.descuento_centavos,
     monto_final_centavos: calculo.monto_final_centavos,
@@ -231,18 +240,18 @@ export async function pagarSolicitud(
     return (await repo.transicionarTransaccion(tx.id, ["creando"], { estado: "pendiente" }))!;
   }
 
-  // CoDi: solicitud de cobro al celular del cliente. Un POST a Pey nunca se reintenta a ciegas.
-  const comercio = await repo.comercio(s.comercio_id);
+  // CoDi: solicitud de cobro al celular de quien paga. Un POST a Pey nunca se reintenta a ciegas.
   const numRef = numRefDesdeId(tx.id);
   const expira = new Date(Date.now() + EXPIRACION_COBRO_SEG * 1000);
+  const concepto = `${producto.nombre}${convenio ? ` - ${convenio.nombre}` : ""} - ${comercio.nombre}`.slice(0, 120);
   try {
     const r = await pey.crearPushNotification({
       amount: centavosAPesos(cobrado),
       phoneNumber: u.celular!,
-      concept: `${convenio.nombre} - ${comercio?.nombre ?? "Comercio"}`.slice(0, 120),
+      concept: concepto,
       expiration: EXPIRACION_COBRO_SEG,
       numRef,
-      ...(comercio?.pey_bank_account_id ? { bankAccountId: comercio.pey_bank_account_id } : {}),
+      ...(comercio.pey_bank_account_id ? { bankAccountId: comercio.pey_bank_account_id } : {}),
       metadata: { txId: tx.id, modoPrueba: e.MODO_PRUEBA },
     });
     return (await repo.transicionarTransaccion(tx.id, ["creando"], {
@@ -255,14 +264,15 @@ export async function pagarSolicitud(
   } catch (err) {
     const incierto = err instanceof PeyError ? err.incierto : true;
     const msg = (err instanceof Error ? err.message : "Error desconocido").slice(0, 300);
+    console.error("[pey] crearPushNotification", err instanceof PeyError ? { status: err.status, tipo: err.tipo, requestId: err.requestId } : msg);
     if (incierto) {
       await repo.transicionarTransaccion(tx.id, ["creando"], { estado: "incierta", error: msg, expira_en: expira });
       throw new ErrorHttp(502, "cobro_incierto", "No confirmamos si el cobro llegó a tu banco. Revisa tu app bancaria en unos segundos.");
     }
-    // Falla clara: se libera la solicitud para que el cliente pueda reintentar o pagar en efectivo.
-    await repo.transicionarTransaccion(tx.id, ["creando"], { estado: "fallida", error: msg, solicitud_id: null });
-    await repo.actualizarSolicitud(s.id, ["tomada"], { estado: "abierta", transaccion_id: null });
-    throw new ErrorHttp(502, "cobro_fallido", "El sistema de pagos rechazó el cobro. Intenta de nuevo o paga en efectivo.");
+    await repo.transicionarTransaccion(tx.id, ["creando"], { estado: "fallida", error: msg });
+    await repo.actualizarSolicitud(s.id, ["tomada"], { estado: "cancelada" });
+    const detalle = err instanceof PeyError ? ` (${err.message})` : "";
+    throw new ErrorHttp(502, "cobro_fallido", `El sistema de pagos rechazó el cobro${detalle}. Intenta de nuevo o paga en efectivo.`);
   }
 }
 
@@ -377,18 +387,17 @@ export async function refrescarTransaccion(tx: Transaccion): Promise<Transaccion
 
 async function notificarPago(tx: Transaccion) {
   const { repo } = ctx();
-  const [cred, comercio, convenio] = await Promise.all([
-    repo.credencial(tx.credencial_id),
+  const [comercio, convenio] = await Promise.all([
     repo.comercio(tx.comercio_id),
-    repo.convenio(tx.convenio_id),
+    tx.convenio_id ? repo.convenio(tx.convenio_id) : Promise.resolve(null),
   ]);
-  if (!cred) return;
-  const t = ticketDe(tx, comercio?.nombre ?? "Comercio", convenio?.nombre ?? "Convenio");
+  if (!tx.pagador_id) return;
+  const t = ticketDe(tx, comercio?.nombre ?? "Comercio", convenio?.nombre ?? PRECIO_GENERAL);
   await repo.notificar({
-    usuario_id: cred.usuario_id,
+    usuario_id: tx.pagador_id,
     tipo: "pago_confirmado",
     titulo: `Pagaste ${t.monto_pagado} en ${t.comercio}`,
-    cuerpo: `Ahorraste ${t.descuento} con ${t.convenio}.`,
+    cuerpo: convenio ? `Ahorraste ${t.descuento} con ${t.convenio}.` : "Pago a precio general.",
     datos: { transaccion_id: tx.id },
   });
 }
@@ -410,9 +419,14 @@ export function ticketDe(tx: Transaccion, comercio: string, convenio: string): T
 }
 
 /** Vista de la transacción (el comercio nunca ve datos del cliente: solo el convenio aplicado). */
+const PRECIO_GENERAL = "Precio general (sin descuento)";
+
 export async function vistaTransaccion(tx: Transaccion) {
   const { repo } = ctx();
-  const [comercio, convenio] = await Promise.all([repo.comercio(tx.comercio_id), repo.convenio(tx.convenio_id)]);
+  const [comercio, convenio] = await Promise.all([
+    repo.comercio(tx.comercio_id),
+    tx.convenio_id ? repo.convenio(tx.convenio_id) : Promise.resolve(null),
+  ]);
   return {
     id: tx.id,
     solicitud_id: tx.solicitud_id,
@@ -420,7 +434,8 @@ export async function vistaTransaccion(tx: Transaccion) {
     metodo: tx.metodo,
     canal: tx.canal,
     comercio: comercio?.nombre ?? "Comercio",
-    convenio: convenio?.nombre ?? "Convenio",
+    convenio: convenio?.nombre ?? PRECIO_GENERAL,
+    con_descuento: Boolean(convenio),
     precio_original_centavos: tx.precio_original_centavos,
     descuento_centavos: tx.descuento_centavos,
     monto_final_centavos: tx.monto_final_centavos,
@@ -431,7 +446,7 @@ export async function vistaTransaccion(tx: Transaccion) {
     pagada_en: tx.pagada_en?.toISOString() ?? null,
     created_at: tx.created_at.toISOString(),
     pey_id: tx.pey_id,
-    ticket: tx.estado === "pagada" ? ticketDe(tx, comercio?.nombre ?? "Comercio", convenio?.nombre ?? "Convenio") : null,
+    ticket: tx.estado === "pagada" ? ticketDe(tx, comercio?.nombre ?? "Comercio", convenio?.nombre ?? PRECIO_GENERAL) : null,
     simulado: env().PEY_SIMULADO,
   };
 }
@@ -439,9 +454,6 @@ export type VistaTransaccion = Awaited<ReturnType<typeof vistaTransaccion>>;
 
 export async function puedeVerTransaccion(tx: Transaccion, u: Perfil): Promise<boolean> {
   if (u.rol === "comercio") return tx.comercio_id === u.comercio_id;
-  if (u.rol === "beneficiario") {
-    const c = await ctx().repo.credencial(tx.credencial_id);
-    return c?.usuario_id === u.id;
-  }
+  if (u.rol === "beneficiario") return tx.pagador_id === u.id;
   return false;
 }

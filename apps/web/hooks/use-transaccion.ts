@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { supabaseNavegador } from "@/lib/supabase/client";
-import type { Ticket } from "@cdv/core";
+import type { Compra, Ticket } from "@cdv/core";
 
 export interface VistaTx {
   id: string;
@@ -14,6 +14,8 @@ export interface VistaTx {
   canal: "pn" | "qr" | null;
   comercio: string;
   convenio: string;
+  con_descuento: boolean;
+  compra: Compra;
   precio_original_centavos: number;
   descuento_centavos: number;
   monto_final_centavos: number;

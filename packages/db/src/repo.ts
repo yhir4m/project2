@@ -39,7 +39,11 @@ export interface Repositorio {
   comercio(id: string): Promise<Comercio | null>;
   conveniosDeComercio(comercioId: string): Promise<Convenio[]>;
   comerciosDeConvenio(convenioId: string): Promise<Comercio[]>;
-  productos(comercioId: string): Promise<Producto[]>;
+  productos(comercioId: string, filtro?: { incluirInactivos?: boolean }): Promise<Producto[]>;
+  producto(id: string): Promise<Producto | null>;
+  /** El precio se fija al crear el QR; no se edita (para cambiarlo se crea otro). */
+  crearProducto(p: Pick<Producto, "comercio_id" | "sku" | "nombre" | "precio_centavos">): Promise<Producto>;
+  activarProducto(id: string, activo: boolean): Promise<Producto>;
   /** ATÓMICO: `buscar_convenio()`. */
   buscarConvenio(args: { emisorId: string; tipoBeneficiario: string; comercioId: string }): Promise<Convenio | null>;
 

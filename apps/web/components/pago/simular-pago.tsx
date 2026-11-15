@@ -11,7 +11,7 @@ export function SimularPago({ transaccionId, texto = "Simular autorización en m
   const [cargando, setCargando] = useState(false);
   return (
     <div className="space-y-2 rounded-xl border-2 border-dashed border-aviso/50 p-3">
-      <p className="text-sm font-semibold text-aviso">Demo sin Pey real</p>
+      <p className="text-sm font-semibold text-aviso">Simulador de autorización bancaria</p>
       <Button
         variant="secundario"
         cargando={cargando}

@@ -195,11 +195,20 @@ export class RepositorioSupabase implements Repositorio {
       .filter((c): c is Tables<"comercios"> => Boolean(c && c.activo))
       .map(aComercio);
   }
-  async productos(comercioId: string) {
-    return ok(
-      await this.db.from("productos").select("*").eq("comercio_id", comercioId).eq("activo", true).order("nombre"),
-      "productos",
-    ).map(aProducto);
+  async productos(comercioId: string, filtro: { incluirInactivos?: boolean } = {}) {
+    let q = this.db.from("productos").select("*").eq("comercio_id", comercioId).order("nombre");
+    if (!filtro.incluirInactivos) q = q.eq("activo", true);
+    return ok(await q, "productos").map(aProducto);
+  }
+  async producto(id: string) {
+    const r = opt(await this.db.from("productos").select("*").eq("id", id).maybeSingle(), "producto");
+    return r ? aProducto(r) : null;
+  }
+  async crearProducto(p: Parameters<Repositorio["crearProducto"]>[0]) {
+    return aProducto(ok(await this.db.from("productos").insert(p).select("*").single(), "crearProducto"));
+  }
+  async activarProducto(id: string, activo: boolean) {
+    return aProducto(ok(await this.db.from("productos").update({ activo }).eq("id", id).select("*").single(), "activarProducto"));
   }
   async buscarConvenio(a: { emisorId: string; tipoBeneficiario: string; comercioId: string }) {
     const r = ok(
@@ -465,16 +474,11 @@ export class RepositorioSupabase implements Repositorio {
     return ok(await q, "transaccionesDeComercio").map(aTransaccion);
   }
   async transaccionesDeUsuario(usuarioId: string) {
-    const creds = ok(await this.db.from("credenciales").select("id").eq("usuario_id", usuarioId), "credsUsuario");
-    if (!creds.length) return [];
     return ok(
       await this.db
         .from("transacciones")
         .select("*")
-        .in(
-          "credencial_id",
-          creds.map((c) => c.id),
-        )
+        .eq("pagador_id", usuarioId)
         .order("created_at", { ascending: false })
         .limit(100),
       "transaccionesDeUsuario",
@@ -561,7 +565,7 @@ export class RepositorioSupabase implements Repositorio {
     );
     const filas = new Map<string, FilaReporteEmisor>();
     for (const t of txs) {
-      if (!t.pagada_en) continue;
+      if (!t.pagada_en || !t.convenio_id) continue;
       const dia = fechaCdmx(new Date(t.pagada_en));
       if (dia < desde || dia > hasta) continue;
       const k = `${dia}|${t.convenio_id}`;

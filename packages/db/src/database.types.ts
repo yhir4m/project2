@@ -329,9 +329,9 @@ export type Database = {
           canal: Database["public"]["Enums"]["canal_codi"] | null;
           comercio_id: string;
           compra: Json;
-          convenio_id: string;
+          convenio_id: string | null;
           created_at: string;
-          credencial_id: string;
+          credencial_id: string | null;
           descuento_centavos: number;
           error: string | null;
           estado: Database["public"]["Enums"]["estado_transaccion"];
@@ -343,6 +343,7 @@ export type Database = {
           monto_cobrado_centavos: number;
           monto_final_centavos: number;
           pagada_en: string | null;
+          pagador_id: string | null;
           pey_codi_id: string | null;
           pey_id: string | null;
           pey_num_ref: string | null;
@@ -355,9 +356,9 @@ export type Database = {
           canal?: Database["public"]["Enums"]["canal_codi"] | null;
           comercio_id: string;
           compra: Json;
-          convenio_id: string;
+          convenio_id: string | null;
           created_at?: string;
-          credencial_id: string;
+          credencial_id: string | null;
           descuento_centavos: number;
           error?: string | null;
           estado?: Database["public"]["Enums"]["estado_transaccion"];
@@ -369,6 +370,7 @@ export type Database = {
           monto_cobrado_centavos: number;
           monto_final_centavos: number;
           pagada_en?: string | null;
+          pagador_id?: string | null;
           pey_codi_id?: string | null;
           pey_id?: string | null;
           pey_num_ref?: string | null;
@@ -381,9 +383,9 @@ export type Database = {
           canal?: Database["public"]["Enums"]["canal_codi"] | null;
           comercio_id?: string;
           compra?: Json;
-          convenio_id?: string;
+          convenio_id?: string | null;
           created_at?: string;
-          credencial_id?: string;
+          credencial_id?: string | null;
           descuento_centavos?: number;
           error?: string | null;
           estado?: Database["public"]["Enums"]["estado_transaccion"];
@@ -395,6 +397,7 @@ export type Database = {
           monto_cobrado_centavos?: number;
           monto_final_centavos?: number;
           pagada_en?: string | null;
+          pagador_id?: string | null;
           pey_codi_id?: string | null;
           pey_id?: string | null;
           pey_num_ref?: string | null;

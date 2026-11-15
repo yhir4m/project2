@@ -5,8 +5,8 @@ import { guardiaRol } from "@/lib/server/guardia";
 export const dynamic = "force-dynamic";
 
 const NAV: ItemNav[] = [
-  { href: "/c", etiqueta: "Cobrar", icono: "cobrar", exacto: true },
-  { href: "/c/corte", etiqueta: "Corte del día", icono: "corte" },
+  { href: "/c", etiqueta: "Mis QR", icono: "qr", exacto: true },
+  { href: "/c/corte", etiqueta: "Pagos de hoy", icono: "corte" },
 ];
 
 export default async function LayoutComercio({ children }: { children: ReactNode }) {
