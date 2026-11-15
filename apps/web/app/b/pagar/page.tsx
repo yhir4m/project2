@@ -4,8 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { Banknote, BadgePercent, ScanLine, Smartphone, Store, XCircle } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Compra, ResultadoDescuento } from "@cdv/core";
 import { Contenido, Encabezado } from "@/components/app-shell";
@@ -32,9 +32,18 @@ const MOTIVOS: Record<string, string> = {
   monto_minimo: "La compra no alcanza el mínimo de tu convenio.",
 };
 
-/** Cliente · Pagar: escanea el código del negocio, revisa su descuento y paga. */
-export default function Pagar() {
+export default function PagarPagina() {
+  return (
+    <Suspense>
+      <Pagar />
+    </Suspense>
+  );
+}
+
+/** Cliente · Pagar: escanea el código del negocio (o llega por su enlace), revisa su descuento y paga. */
+function Pagar() {
   const router = useRouter();
+  const params = useSearchParams();
   const yo = useYo();
   const [codigo, setCodigo] = useState<string | null>(null);
   const [previa, setPrevia] = useState<Previa | null>(null);
@@ -74,7 +83,18 @@ export default function Pagar() {
     },
   });
 
+  // Llegó desde el enlace del QR (cámara normal del celular): abrir el cobro directo.
+  const desdeEnlace = params.get("s");
+  const yaLeido = useRef(false);
+  useEffect(() => {
+    if (desdeEnlace && !yaLeido.current) {
+      yaLeido.current = true;
+      leer.mutate(desdeEnlace);
+    }
+  }, [desdeEnlace, leer]);
+
   const reiniciar = () => {
+    if (desdeEnlace) router.replace("/b/pagar");
     setCodigo(null);
     setPrevia(null);
     setError(null);

@@ -4,7 +4,6 @@ import {
   centavosAPesos,
   construirTicket,
   describirRegla,
-  firmarCobro,
   leerCobro,
   MENSAJES_ERROR_COBRO,
   montoACobrar,
@@ -40,9 +39,10 @@ export async function crearSolicitud(comercioId: string, compra: Compra) {
   });
 }
 
-export async function qrDeSolicitud(s: SolicitudCobro): Promise<string | null> {
+/** Contenido del QR: un enlace corto que abre la pantalla de pago (lo lee cualquier cámara de celular). */
+export function qrDeSolicitud(s: SolicitudCobro, urlPublica: string): string | null {
   if (s.estado !== "abierta" || s.expira_en.getTime() <= Date.now()) return null;
-  return firmarCobro({ solicitudId: s.id, comercioId: s.comercio_id, expiraEn: s.expira_en }, ctx().verificacionKey);
+  return `${urlPublica.replace(/\/$/, "")}/pagar/${s.id}`;
 }
 
 export async function solicitudDeComercio(id: string, comercioId: string) {
@@ -81,11 +81,27 @@ export async function confirmarEfectivo(id: string, comercioId: string) {
 // 2. El CLIENTE escanea el QR del comercio
 // ===========================================================================
 
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/**
+ * Acepta lo que lea cualquier lector: el enlace del QR (`https://…/pagar/<id>`), el id solo,
+ * o el token firmado anterior (`CDVC1.…`). La seguridad no depende del QR: la solicitud se valida
+ * en la base (abierta, vigente) y se toma una sola vez de forma atómica.
+ */
 async function solicitudDesdeQr(contenido: string) {
-  const r = await leerCobro(contenido, ctx().verificacionKey);
-  if (!r.ok) throw new ErrorHttp(422, r.error, MENSAJES_ERROR_COBRO[r.error]);
-  const s = await ctx().repo.solicitud(r.claims.sid);
-  if (!s || s.comercio_id !== r.claims.com) throw new ErrorHttp(422, "firma_invalida", MENSAJES_ERROR_COBRO.firma_invalida);
+  const raw = contenido.trim();
+  let id: string | null = null;
+  if (raw.startsWith("CDVC1.")) {
+    const r = await leerCobro(raw, ctx().verificacionKey);
+    if (!r.ok) throw new ErrorHttp(422, r.error, MENSAJES_ERROR_COBRO[r.error]);
+    id = r.claims.sid;
+  } else {
+    const m = raw.match(/\/pagar\/([0-9a-f-]{36})/i) ?? (UUID.test(raw) && raw.length === 36 ? [raw, raw] : null);
+    id = m?.[1] ?? null;
+  }
+  if (!id) throw new ErrorHttp(422, "no_es_cobro", MENSAJES_ERROR_COBRO.no_es_cobro);
+  const s = await ctx().repo.solicitud(id);
+  if (!s) throw new ErrorHttp(404, "no_encontrada", "No encontramos este cobro. Pide al negocio un código nuevo.");
   if (s.estado !== "abierta") {
     throw new ErrorHttp(409, "solicitud_no_disponible", "Este cobro ya fue pagado o cancelado. Pide uno nuevo al negocio.");
   }

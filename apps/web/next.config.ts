@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   transpilePackages: ["@cdv/core", "@cdv/db", "@cdv/pey", "@cdv/ui"],
   poweredByHeader: false,
+  // Permite usar `next dev` detrás del túnel HTTPS de cloudflared (celular).
+  allowedDevOrigins: ["*.trycloudflare.com"],
   async headers() {
     return [
       {

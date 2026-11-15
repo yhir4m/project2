@@ -5,12 +5,34 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Detener = () => void;
+type DetectorNativo = { detect: (v: ImageBitmapSource) => Promise<{ rawValue: string }[]> };
+type ClaseDetector = (new (o: { formats: string[] }) => DetectorNativo) & { getSupportedFormats?: () => Promise<string[]> };
+
+/** Detector nativo del navegador si existe y soporta QR (Chrome/Android). En iOS Safari no existe → zxing. */
+async function detectorNativo(): Promise<DetectorNativo | null> {
+  const BD = (globalThis as unknown as { BarcodeDetector?: ClaseDetector }).BarcodeDetector;
+  if (!BD) return null;
+  try {
+    const formatos = (await BD.getSupportedFormats?.()) ?? ["qr_code"];
+    return formatos.includes("qr_code") ? new BD({ formats: ["qr_code"] }) : null;
+  } catch {
+    return null;
+  }
+}
+
+function mensajeError(e: unknown): string {
+  const n = e instanceof Error ? e.name : "";
+  if (n === "NotAllowedError" || n === "SecurityError") return "Permite el acceso a la cámara (ícono junto a la dirección) y recarga.";
+  if (n === "NotFoundError" || n === "OverconstrainedError") return "No encontramos una cámara en este dispositivo.";
+  if (n === "NotReadableError") return "La cámara está ocupada por otra app. Ciérrala e intenta de nuevo.";
+  return "No pudimos abrir la cámara.";
+}
 
 /**
  * Escáner de QR a pantalla completa.
- * Motor principal: @zxing/browser. Respaldo: BarcodeDetector nativo (si existe).
- * Requiere HTTPS (o localhost) para acceder a la cámara.
+ * - Cada arranque es dueño de su propio stream (seguro con el doble montaje de React en desarrollo).
+ * - Motor: BarcodeDetector nativo si soporta QR; si no, @zxing/browser sobre el mismo stream.
+ * - La cámara en vivo requiere HTTPS (o localhost); si no, queda el botón "Tomar foto del código".
  */
 export function Escaner({
   onLeer,
@@ -25,6 +47,7 @@ export function Escaner({
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [listo, setListo] = useState(false);
   const [manual, setManual] = useState("");
   const ultimo = useRef<{ t: string; at: number } | null>(null);
   const onLeerRef = useRef(onLeer);
@@ -33,10 +56,14 @@ export function Escaner({
   pausadoRef.current = pausado;
 
   useEffect(() => {
-    let detener: Detener | null = null;
-    let cancelado = false;
+    const elVideo = video.current;
+    let activo = true;
+    let stream: MediaStream | null = null;
+    let detenerZxing: (() => void) | null = null;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
     const entregar = (t: string) => {
-      if (pausadoRef.current) return;
+      if (!activo || pausadoRef.current || !t) return;
       const ahora = Date.now();
       if (ultimo.current && ultimo.current.t === t && ahora - ultimo.current.at < 4000) return;
       ultimo.current = { t, at: ahora };
@@ -46,55 +73,76 @@ export function Escaner({
 
     async function iniciar() {
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError(window.isSecureContext ? "Este navegador no permite usar la cámara en vivo." : "La cámara en vivo solo funciona si abres la app con https://.");
+        setError(
+          window.isSecureContext
+            ? "Este navegador no permite usar la cámara en vivo."
+            : "La cámara en vivo solo funciona si abres la app con https://.",
+        );
         return;
       }
       try {
-        const { BrowserQRCodeReader } = await import("@zxing/browser");
-        const lector = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 150 });
-        const controles = await lector.decodeFromConstraints(
-          { video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false },
-          video.current!,
-          (r) => r && entregar(r.getText()),
-        );
-        if (cancelado) controles.stop();
-        else detener = () => controles.stop();
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
       } catch (e) {
-        // Respaldo: BarcodeDetector nativo.
-        const BD = (globalThis as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-        if (!BD) {
-          setError(e instanceof Error && e.name === "NotAllowedError" ? "Permite el acceso a la cámara para escanear." : "No pudimos abrir la cámara.");
-          return;
-        }
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
-          if (cancelado) return stream.getTracks().forEach((t) => t.stop());
-          video.current!.srcObject = stream;
-          await video.current!.play();
-          const det = new BD({ formats: ["qr_code"] });
-          let vivo = true;
-          const ciclo = async () => {
-            if (!vivo) return;
+        if (activo) setError(mensajeError(e));
+        return;
+      }
+      const v = elVideo;
+      if (!activo || !v) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      v.srcObject = stream;
+      v.setAttribute("playsinline", "true");
+      try {
+        await v.play();
+      } catch {
+        /* iOS puede requerir gesto; el video muted+playsinline normalmente arranca */
+      }
+      if (!activo) return;
+      setListo(true);
+
+      const nativo = await detectorNativo();
+      if (nativo) {
+        const ciclo = async () => {
+          if (!activo) return;
+          if (v.readyState >= 2) {
             try {
-              const [c] = await det.detect(video.current!);
+              const [c] = await nativo.detect(v);
               if (c?.rawValue) entregar(c.rawValue);
-            } catch {}
-            setTimeout(ciclo, 200);
-          };
-          void ciclo();
-          detener = () => {
-            vivo = false;
-            stream.getTracks().forEach((t) => t.stop());
-          };
-        } catch {
-          setError("Permite el acceso a la cámara para escanear.");
-        }
+            } catch {
+              /* frame no listo */
+            }
+          }
+          timer = setTimeout(ciclo, 180);
+        };
+        void ciclo();
+        return;
+      }
+
+      const { BrowserQRCodeReader } = await import("@zxing/browser");
+      if (!activo) return;
+      const lector = new BrowserQRCodeReader(undefined, { delayBetweenScanAttempts: 150, delayBetweenScanSuccess: 1500 });
+      try {
+        const controles = await lector.decodeFromStream(stream, v, (r) => r && entregar(r.getText()));
+        if (!activo) controles.stop();
+        else detenerZxing = () => controles.stop();
+      } catch (e) {
+        if (activo) setError(mensajeError(e));
       }
     }
-    void iniciar();
+
+    // Arranque en el siguiente tick: si React desmonta de inmediato (StrictMode), nunca se pide la cámara.
+    const arranque = setTimeout(() => void iniciar(), 0);
     return () => {
-      cancelado = true;
-      detener?.();
+      activo = false;
+      clearTimeout(arranque);
+      if (timer) clearTimeout(timer);
+      detenerZxing?.();
+      stream?.getTracks().forEach((t) => t.stop());
+      if (elVideo && elVideo.srcObject === stream) elVideo.srcObject = null;
     };
   }, []);
 
@@ -108,7 +156,7 @@ export function Escaner({
             {["left-0 top-0 border-l-4 border-t-4 rounded-tl-3xl", "right-0 top-0 border-r-4 border-t-4 rounded-tr-3xl", "left-0 bottom-0 border-l-4 border-b-4 rounded-bl-3xl", "right-0 bottom-0 border-r-4 border-b-4 rounded-br-3xl"].map((c) => (
               <span key={c} className={`absolute size-12 border-white ${c}`} />
             ))}
-            {!pausado && !error ? <span className="absolute inset-x-4 top-1/2 h-0.5 animate-pulse bg-white/80" /> : null}
+            {!pausado && !error && listo ? <span className="absolute inset-x-4 top-1/2 h-0.5 animate-pulse bg-white/80" /> : null}
           </div>
         </div>
         {error ? (
@@ -117,6 +165,9 @@ export function Escaner({
             <p className="text-lg font-semibold">{error}</p>
             <p className="text-base">Usa el botón “Tomar foto del código”.</p>
           </div>
+        ) : null}
+        {!listo && !error ? (
+          <p className="absolute inset-0 grid place-items-center text-base font-semibold text-white">Abriendo cámara…</p>
         ) : null}
         <p className="absolute inset-x-0 bottom-3 text-center text-base font-semibold text-white drop-shadow">
           {indicacion}

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { ctx } from "@/lib/server/contexto";
 import { qrDeSolicitud, refrescarTransaccion, solicitudDeComercio, vistaTransaccion } from "@/lib/server/cobros";
 import { ruta } from "@/lib/server/http";
+import { urlPublica } from "@/lib/server/url-publica";
 import { requerirRol } from "@/lib/server/sesion";
 
 export const runtime = "nodejs";
 
 /** Estado en vivo de la solicitud del comercio: QR (si sigue abierta) y transacción (cuando el cliente paga). */
-export const GET = ruta(async (_req: Request, { params }: { params: Promise<{ id: string }> }) => {
+export const GET = ruta(async (req: Request, { params }: { params: Promise<{ id: string }> }) => {
   const u = await requerirRol("comercio");
   const { id } = await params;
   const s = await solicitudDeComercio(id, u.comercio_id!);
@@ -23,7 +24,7 @@ export const GET = ruta(async (_req: Request, { params }: { params: Promise<{ id
         total_centavos: actual.total_centavos,
         expira_en: actual.expira_en.toISOString(),
       },
-      qr: await qrDeSolicitud(actual),
+      qr: qrDeSolicitud(actual, await urlPublica(req)),
       transaccion: tx ? await vistaTransaccion(tx) : null,
     },
     { headers: { "Cache-Control": "no-store" } },
