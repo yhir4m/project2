@@ -4,30 +4,29 @@
 
 **Problema:** estudiantes, personas adultas mayores (INAPAM) y otros grupos tienen descuentos por convenio, pero en cada compra deben mostrar una credencial física: fricción, fraude y cero registro.
 
-**Solución:** se verifica la elegibilidad **una vez por periodo** (correo institucional o documento revisado con IA) y se emite una **credencial digital firmada (Ed25519)** que vive en la app del cliente. Al pagar, el **comercio muestra un QR de cobro** y el **cliente lo escanea con la app**: el servidor valida la firma del emisor, la vigencia, la revocación y el dispositivo, calcula el descuento y envía la **solicitud de cobro CoDi al celular del cliente** por el monto exacto (API de Pey). Ambas partes ven el ticket en tiempo real. El comercio nunca ve nombre, edad ni celular: solo "descuento verificado: convenio X".
+**Solución:** se verifica la elegibilidad **una vez por periodo** (correo institucional o documento revisado con IA) y se emite una **credencial digital firmada (Ed25519)** que vive en la app del cliente. El negocio tiene **QR fijos con precio** (uno por producto o servicio, impresos o en pantalla). Quien paga lo **escanea con la cámara de su celular**, ve el precio y paga **según su perfil**: con su descuento de estudiante o INAPAM, o a precio general si no tiene credencial. El servidor valida la firma del emisor, la vigencia, la revocación y el dispositivo, calcula el descuento y envía la **solicitud de cobro CoDi a su celular** (API de Pey). El negocio ve cada pago en tiempo real y nunca ve nombre, edad ni celular: solo "descuento: convenio X" o "precio general".
 
 ## Arquitectura
 
 ```mermaid
 sequenceDiagram
-  participant C as Comercio (PWA)
+  participant C as Negocio (PWA)
   participant API as API (Next.js)
   participant DB as Supabase
-  participant B as Cliente (PWA)
+  participant B as Quien paga (celular)
   participant P as Pey · CoDi
-  C->>API: POST /api/c/solicitudes (monto o productos)
-  API->>DB: solicitud abierta (5 min)
-  API-->>C: QR firmado (HS256, sin montos ni datos)
-  B->>API: escanea → POST /api/b/cobro/previsualizar
-  API-->>B: comercio, compra, descuento y total (calculados en el servidor)
-  B->>API: POST /api/b/cobro/pagar (credencial + dispositivo)
-  API->>DB: verifica credencial Ed25519 + revocación · tomar_solicitud() atómico
-  API->>P: POST /codi/pn (celular del cliente, monto con descuento)
+  C->>API: crea QR fijo (producto + precio, una sola vez)
+  API-->>C: enlace https://…/pagar/p/<id> → se imprime / muestra
+  B->>API: escanea con la cámara → POST /api/b/cobro/previsualizar
+  API-->>B: precio del QR y total según su perfil (descuento o general)
+  B->>API: POST /api/b/cobro/pagar (credencial opcional + dispositivo)
+  API->>DB: verifica credencial Ed25519 + revocación · crea cobro de un solo uso
+  API->>P: POST /codi/pn (su celular, monto final)
   P-->>B: notificación CoDi en su app bancaria
   P->>API: webhook firmado (Standard Webhooks)
   API->>P: GET /transaction/:id → PAID y monto correcto
-  API->>DB: transacción pagada · solicitud pagada
-  DB-->>C: Realtime → ticket
+  API->>DB: transacción pagada
+  DB-->>C: Realtime → "Pagos de hoy"
   DB-->>B: Realtime → ticket + notificación
 ```
 
@@ -94,15 +93,16 @@ cloudflared tunnel --url http://localhost:3000
 
 ## Cómo probar con MODO_PRUEBA
 
-1. En `/` entra como **Comercio · Negocio de Ramón Orraca** (el único negocio de la demo; sus cobros CoDi caen en la cuenta de Ramón Orraca, la única activa en Pey). En otra ventana (privada) o en tu celular, entra como **Beneficiario · Ana**.
-2. Comercio → **Cobrar**: captura $100 (o elige productos) → **Generar código de cobro**. Aparece el QR.
-3. Ana → **Pagar**: escanea el QR (en demo también puedes pegarlo). Ve el desglose: $100 − 10 % = **$90**.
-4. Si Ana no tiene celular, la app se lo pide (lo necesita CoDi). Luego **Pagar con CoDi**.
-5. Con `MODO_PRUEBA=true` se cobran **$0.10 reales**; el ticket muestra el desglose completo y la leyenda de modo prueba.
-6. Ana autoriza en su app bancaria (con `PEY_SIMULADO=true`: botón “Simular autorización”). El webhook confirma y ambas pantallas muestran el ticket.
-7. **Efectivo:** Ana elige “Pagaré en efectivo” y el comercio toca “Recibí el efectivo”. El descuento y el registro aplican igual.
+Guion completo de la demo: [`docs/DEMO.md`](docs/DEMO.md).
 
-Pey solo tiene producción y **no devuelve pagos**. La doc recomienda montos pequeños.
+1. En la computadora entra como **Comercio · Negocio de Ramón Orraca** → **Mis QR** → abre "Café latte $48" (o crea uno nuevo con su precio).
+2. En el celular (por la URL `https://`) escanea el QR con la **cámara normal** y toca el enlace.
+3. Elige quién paga: **Luis** (estudiante, 20 % en café), **Carmen** (INAPAM, 15 %) o **Pedro** (público general, sin descuento).
+4. Registra tu celular con CoDi cuando lo pida y toca **Pagar con CoDi**. Con `MODO_PRUEBA=true` se cobran **$0.10 reales**; el ticket muestra el desglose completo.
+5. Autoriza en tu app bancaria. En el negocio, **Pagos de hoy** muestra el pago al instante.
+6. **Efectivo:** "Pagaré en efectivo" → el negocio toca **"Recibí el efectivo"**.
+
+Pey solo tiene producción y **no devuelve pagos**. Todos los cobros llegan a la cuenta CoDi ligada a la API key (Ramón Orraca).
 
 ## Pruebas
 ```bash
@@ -112,8 +112,8 @@ pnpm typecheck && pnpm lint
 Pruebas de base de datos (RLS, funciones atómicas, restricciones): ver `supabase/tests/rls.sql`.
 
 ## Seguridad y privacidad
-- El QR del comercio solo lleva el id de la solicitud, el comercio y la expiración (sin montos ni datos personales), firmado por la plataforma.
-- Antirreplay: el QR vence en 5 min y la solicitud se toma una sola vez (`tomar_solicitud` atómico).
+- El QR fijo solo lleva el id del producto (sin datos personales). El precio vive en la base y solo el negocio lo define; quien paga no puede cambiarlo.
+- Cada escaneo crea su propio cobro de un solo uso (`tomar_solicitud` atómico); el QR se reutiliza sin riesgo de pagos duplicados.
 - La credencial del cliente se verifica en cada pago: firma Ed25519 del emisor, revocación, vigencia y dispositivo ligado.
 - El monto y el descuento siempre se calculan en el servidor. El comercio nunca ve nombre, edad ni celular.
 - Webhook verificado sobre el cuerpo crudo y **confirmado consultando la transacción** en Pey (monto, canal, referencia).
