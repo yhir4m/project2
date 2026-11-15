@@ -1,3 +1,8 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# framer-motion 12.23.24 requiere motion-dom/motion-utils de su misma serie.
+overrides:
+  motion-dom: 12.23.23
+  motion-utils: 12.23.6

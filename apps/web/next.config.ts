@@ -1,4 +1,5 @@
 import withSerwistInit from "@serwist/next";
+import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 const withSerwist = withSerwistInit({
@@ -11,6 +12,8 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Raíz del monorepo (evita que Next tome lockfiles fuera del proyecto).
+  outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   transpilePackages: ["@cdv/core", "@cdv/db", "@cdv/pey", "@cdv/ui"],
   poweredByHeader: false,
   async headers() {
