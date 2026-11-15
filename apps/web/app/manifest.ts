@@ -11,8 +11,8 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "portrait",
-    background_color: "#F7F7F4",
-    theme_color: "#0B5FFF",
+    background_color: "#F7F3EB",
+    theme_color: "#C5A358",
     categories: ["finance", "shopping"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
@@ -20,8 +20,8 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icons/icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
-      { name: "Mi QR", url: "/b/qr", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
-      { name: "Escanear", url: "/c", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Pagar", url: "/b/pagar", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
+      { name: "Cobrar", url: "/c", icons: [{ src: "/icons/icon-192.png", sizes: "192x192" }] },
     ],
   };
 }

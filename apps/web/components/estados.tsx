@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 export function Cargando({ texto = "Cargando…" }: { texto?: string }) {
   return (
     <div role="status" className="flex flex-col items-center gap-3 py-16 text-texto-suave">
-      <span className="size-10 animate-spin rounded-full border-4 border-borde border-t-primario" aria-hidden />
+      <span className="size-10 animate-spin rounded-full border-4 border-borde border-t-acento" aria-hidden />
       <span>{texto}</span>
     </div>
   );
@@ -24,7 +24,7 @@ export function Esqueleto({ filas = 3 }: { filas?: number }) {
 export function Vacio({ titulo, children, icono }: { titulo: string; children?: ReactNode; icono?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
-      <div className="grid size-16 place-items-center rounded-full bg-primario/10 text-primario [&_svg]:size-8">{icono ?? <Inbox />}</div>
+      <div className="grid size-16 place-items-center rounded-full bg-primario/10 text-acento [&_svg]:size-8">{icono ?? <Inbox />}</div>
       <h2 className="text-lg font-bold">{titulo}</h2>
       {children ? <div className="text-texto-suave">{children}</div> : null}
     </div>

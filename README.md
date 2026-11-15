@@ -4,29 +4,36 @@
 
 **Problema:** estudiantes, personas adultas mayores (INAPAM) y otros grupos tienen descuentos por convenio, pero en cada compra deben mostrar una credencial física: fricción, fraude y cero registro.
 
-**Solución:** se verifica la elegibilidad **una vez por periodo** (correo institucional o documento revisado con IA) y se emite una **credencial digital firmada (Ed25519)**. Al pagar, el comercio escanea un **QR dinámico de 45 s**, el servidor valida firma, vigencia, revocación y antirreplay, calcula el descuento y envía un **cobro CoDi por el monto exacto** con la API de Pey. Ambas partes reciben el ticket en tiempo real.
+**Solución:** se verifica la elegibilidad **una vez por periodo** (correo institucional o documento revisado con IA) y se emite una **credencial digital firmada (Ed25519)** que vive en la app del cliente. Al pagar, el **comercio muestra un QR de cobro** y el **cliente lo escanea con la app**: el servidor valida la firma del emisor, la vigencia, la revocación y el dispositivo, calcula el descuento y envía la **solicitud de cobro CoDi al celular del cliente** por el monto exacto (API de Pey). Ambas partes ven el ticket en tiempo real. El comercio nunca ve nombre, edad ni celular: solo "descuento verificado: convenio X".
 
 ## Arquitectura
 
 ```mermaid
-flowchart LR
-  subgraph Cliente["PWA mobile-first (Next.js)"]
-    B[Beneficiario<br/>Mi QR 45 s] -->|muestra QR| C[Comercio<br/>Escáner]
-  end
-  C -->|POST /api/c/escanear| API[Route Handlers<br/>Next.js nodejs]
-  API -->|verifica JWS Ed25519 + nonce + revocación| CORE[packages/core]
-  API -->|SQL + RLS + RPC atómicas| DB[(Supabase<br/>Postgres · Auth · Storage · Realtime)]
-  API -->|POST /codi/pn o /codi/qr| PEY[Pey · CoDi]
-  PEY -->|webhook firmado<br/>Standard Webhooks| API
-  API -->|GET /transaction/:id<br/>confirma PAID y monto| PEY
-  DB -->|Realtime| B
-  DB -->|Realtime| C
-  API -->|visión| XAI[xAI Grok]
+sequenceDiagram
+  participant C as Comercio (PWA)
+  participant API as API (Next.js)
+  participant DB as Supabase
+  participant B as Cliente (PWA)
+  participant P as Pey · CoDi
+  C->>API: POST /api/c/solicitudes (monto o productos)
+  API->>DB: solicitud abierta (5 min)
+  API-->>C: QR firmado (HS256, sin montos ni datos)
+  B->>API: escanea → POST /api/b/cobro/previsualizar
+  API-->>B: comercio, compra, descuento y total (calculados en el servidor)
+  B->>API: POST /api/b/cobro/pagar (credencial + dispositivo)
+  API->>DB: verifica credencial Ed25519 + revocación · tomar_solicitud() atómico
+  API->>P: POST /codi/pn (celular del cliente, monto con descuento)
+  P-->>B: notificación CoDi en su app bancaria
+  P->>API: webhook firmado (Standard Webhooks)
+  API->>P: GET /transaction/:id → PAID y monto correcto
+  API->>DB: transacción pagada · solicitud pagada
+  DB-->>C: Realtime → ticket
+  DB-->>B: Realtime → ticket + notificación
 ```
 
 | Paquete | Qué contiene | Reutilizable en Expo |
 |---|---|---|
-| `packages/core` | Motor de reglas, credenciales y QR (jose/EdDSA), elegibilidad, estados de pago | Sí (sin React DOM ni Next) |
+| `packages/core` | Motor de reglas, credenciales (jose/EdDSA), QR de cobro, elegibilidad, estados de pago | Sí (sin React DOM ni Next) |
 | `packages/pey` | Cliente tipado de Pey, verificación de webhooks, simulador opt-in | Sí (servidor) |
 | `packages/db` | Tipos generados de Supabase + `RepositorioSupabase` | Sí (servidor) |
 | `packages/ui` | Tokens de diseño (colores, tipografía ≥ 18 px, toque ≥ 48 px) | Sí |
@@ -87,26 +94,28 @@ cloudflared tunnel --url http://localhost:3000
 
 ## Cómo probar con MODO_PRUEBA
 
-1. En `/` elige **Comercio · Papelería El Cuaderno** en un dispositivo y **Beneficiario · Ana** en otro (o en una ventana privada).
-2. Ana: **Perfil → Celular** (10 dígitos) para recibir el cobro en su app bancaria. Sin celular, el comercio muestra un QR de cobro CoDi.
-3. Ana: **Mi QR**. Comercio: escanea (en demo también puedes pegar el código).
-4. Comercio: captura $100 → verás 10 % de descuento → **Cobrar con CoDi**.
+1. En `/` entra como **Comercio · Papelería El Cuaderno**. En otra ventana (privada) o en tu celular, entra como **Beneficiario · Ana**.
+2. Comercio → **Cobrar**: captura $100 (o elige productos) → **Generar código de cobro**. Aparece el QR.
+3. Ana → **Pagar**: escanea el QR (en demo también puedes pegarlo). Ve el desglose: $100 − 10 % = **$90**.
+4. Si Ana no tiene celular, la app se lo pide (lo necesita CoDi). Luego **Pagar con CoDi**.
 5. Con `MODO_PRUEBA=true` se cobran **$0.10 reales**; el ticket muestra el desglose completo y la leyenda de modo prueba.
-6. Autoriza en tu app bancaria → el webhook confirma y ambas pantallas muestran el ticket.
+6. Ana autoriza en su app bancaria (con `PEY_SIMULADO=true`: botón “Simular autorización”). El webhook confirma y ambas pantallas muestran el ticket.
+7. **Efectivo:** Ana elige “Pagaré en efectivo” y el comercio toca “Recibí el efectivo”. El descuento y el registro aplican igual.
 
 Pey solo tiene producción y **no devuelve pagos**. La doc recomienda montos pequeños.
 
 ## Pruebas
 ```bash
-pnpm test          # unitarias: core (45) + pey (22)
+pnpm test          # unitarias: core (40) + pey (22)
 pnpm typecheck && pnpm lint
 ```
 Pruebas de base de datos (RLS, funciones atómicas, restricciones): ver `supabase/tests/rls.sql`.
 
 ## Seguridad y privacidad
-- El QR solo lleva seudónimo, emisor, tipo, nonce, dispositivo y expiración (sin nombre, edad ni CURP).
-- Antirreplay: TTL de 45 s, nonce de un solo uso (`consumir_nonce` atómico) y token ligado al dispositivo.
-- Revocación consultada al escanear **y** al cobrar. El monto siempre se calcula en el servidor.
+- El QR del comercio solo lleva el id de la solicitud, el comercio y la expiración (sin montos ni datos personales), firmado por la plataforma.
+- Antirreplay: el QR vence en 5 min y la solicitud se toma una sola vez (`tomar_solicitud` atómico).
+- La credencial del cliente se verifica en cada pago: firma Ed25519 del emisor, revocación, vigencia y dispositivo ligado.
+- El monto y el descuento siempre se calculan en el servidor. El comercio nunca ve nombre, edad ni celular.
 - Webhook verificado sobre el cuerpo crudo y **confirmado consultando la transacción** en Pey (monto, canal, referencia).
 - RLS en todas las tablas; escrituras solo vía API. Reportes del emisor solo agregados.
 - Documentos en Storage privado, borrados al terminar la verificación.

@@ -58,7 +58,7 @@ function BottomNav({ items }: { items: ItemNav[] }) {
                 aria-current={activo ? "page" : undefined}
                 className={cn(
                   "flex h-full min-h-12 flex-col items-center justify-center gap-0.5 text-xs font-semibold transition-colors",
-                  activo ? "text-primario" : "text-texto-suave",
+                  activo ? "text-acento" : "text-texto-suave",
                 )}
               >
                 <span className={cn("grid h-8 w-14 place-items-center rounded-full transition", activo && "bg-primario/12")}>

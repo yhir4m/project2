@@ -3,7 +3,7 @@ export * from "./rules/schema";
 export * from "./rules/engine";
 export * from "./crypto/keys";
 export * from "./crypto/credential";
-export * from "./crypto/qr-token";
+export * from "./crypto/cobro-token";
 export * from "./crypto/random";
 export * from "./eligibility/periodo";
 export * from "./eligibility/providers";

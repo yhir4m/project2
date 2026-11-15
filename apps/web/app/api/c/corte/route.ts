@@ -26,6 +26,6 @@ export const GET = ruta(async () => {
       efectivo_centavos: suma((t) => t.monto_final_centavos, pagadas.filter((t) => t.metodo === "efectivo")),
       no_completadas: txs.length - pagadas.length,
     },
-    transacciones: await Promise.all(txs.map((t) => vistaTransaccion(t, u))),
+    transacciones: await Promise.all(txs.map((t) => vistaTransaccion(t))),
   });
 });

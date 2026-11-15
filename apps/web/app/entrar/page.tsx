@@ -77,7 +77,7 @@ function Entrar() {
           </Button>
         </form>
       )}
-      <Link href="/" className="inline-flex min-h-12 items-center font-semibold text-primario underline">
+      <Link href="/" className="inline-flex min-h-12 items-center font-semibold text-acento underline">
         Volver
       </Link>
     </main>

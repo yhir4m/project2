@@ -8,6 +8,8 @@ import type {
   Notificacion,
   Perfil,
   Producto,
+  SolicitudCobro,
+  EstadoSolicitud,
   Transaccion,
   Verificacion,
   WebhookEvento,
@@ -81,12 +83,24 @@ export interface Repositorio {
   /** ATÓMICO: true si está dentro del límite. */
   rateLimit(clave: string, limite: number, ventanaSeg: number): Promise<boolean>;
 
+  // ---- Solicitudes de cobro (las genera el comercio) ----
+  crearSolicitud(s: Pick<SolicitudCobro, "comercio_id" | "compra" | "total_centavos" | "expira_en">): Promise<SolicitudCobro>;
+  solicitud(id: string): Promise<SolicitudCobro | null>;
+  /** ATÓMICO: `tomar_solicitud()` — abierta y vigente → tomada. null si ya la tomó alguien o expiró. */
+  tomarSolicitud(id: string): Promise<SolicitudCobro | null>;
+  /** Actualiza solo si el estado actual está en `desde`. */
+  actualizarSolicitud(
+    id: string,
+    desde: readonly EstadoSolicitud[],
+    cambios: Partial<Pick<SolicitudCobro, "estado" | "transaccion_id">>,
+  ): Promise<SolicitudCobro | null>;
+
   // ---- Transacciones ----
   /** Idempotente: si ya existe la `idempotency_key`, regresa la existente con `creada = false`. */
   crearTransaccion(
     t: Nueva<
       Transaccion,
-      "estado" | "pey_id" | "pey_codi_id" | "pey_qr_string" | "pey_num_ref" | "expira_en" | "pagada_en" | "error"
+      "estado" | "solicitud_id" | "pey_id" | "pey_codi_id" | "pey_qr_string" | "pey_num_ref" | "expira_en" | "pagada_en" | "error"
     >,
   ): Promise<{ transaccion: Transaccion; creada: boolean }>;
   transaccion(id: string): Promise<Transaccion | null>;

@@ -44,7 +44,7 @@ export default function Notificaciones() {
           <ul className="space-y-2">
             {q.data!.map((n) => {
               const contenido = (
-                <div className={`rounded-xl border p-4 ${n.leida ? "border-borde bg-superficie" : "border-primario/40 bg-primario/5"}`}>
+                <div className={`rounded-xl border p-4 ${n.leida ? "border-borde bg-superficie" : "border-acento/40 bg-primario/5"}`}>
                   <p className="font-bold">{n.titulo}</p>
                   {n.cuerpo ? <p className="text-texto-suave">{n.cuerpo}</p> : null}
                   <p className="mt-1 text-sm text-texto-suave">{fechaHora(n.created_at)}</p>

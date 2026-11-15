@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Smartphone } from "lucide-react";
+import { Banknote, Smartphone } from "lucide-react";
 import Link from "next/link";
 import { use, useEffect } from "react";
 import { toast } from "sonner";
@@ -12,8 +12,9 @@ import { SimularPago } from "@/components/pago/simular-pago";
 import { TicketVista } from "@/components/ticket";
 import { Button } from "@/components/ui/button";
 import { useTransaccionEnVivo } from "@/hooks/use-transaccion";
+import { mxn } from "@/lib/utils";
 
-/** Pago pendiente del beneficiario: autoriza en su app bancaria; la pantalla se actualiza sola. */
+/** Cliente: esperando autorización en su banco (o que el negocio confirme el efectivo) → ticket. */
 export default function PagoPendiente({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const q = useTransaccionEnVivo(id);
@@ -45,20 +46,18 @@ export default function PagoPendiente({ params }: { params: Promise<{ id: string
           <EstadoFinalNoPagado tx={tx} />
         ) : (
           <>
-            <motion.div
-              className="flex flex-col items-center gap-3 py-4 text-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-            >
+            <motion.div className="flex flex-col items-center gap-3 py-4 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <motion.div
                 animate={{ scale: [1, 1.08, 1] }}
                 transition={{ repeat: Infinity, duration: 1.6 }}
-                className="grid size-20 place-items-center rounded-full bg-primario/10 text-primario"
+                className="grid size-20 place-items-center rounded-full bg-primario/20 text-acento"
               >
-                <Smartphone className="size-10" aria-hidden />
+                {tx.metodo === "efectivo" ? <Banknote className="size-10" aria-hidden /> : <Smartphone className="size-10" aria-hidden />}
               </motion.div>
               <p className="text-xl font-bold">
-                {tx.canal === "pn" ? "Abre tu app bancaria y autoriza el cobro CoDi" : "Escanea el código de cobro en la pantalla del negocio"}
+                {tx.metodo === "efectivo"
+                  ? `Entrega ${mxn(tx.monto_final_centavos)} en efectivo al negocio`
+                  : "Abre tu app bancaria y autoriza el cobro CoDi"}
               </p>
               <p className="text-texto-suave">Esta pantalla se actualizará sola cuando se confirme el pago.</p>
             </motion.div>

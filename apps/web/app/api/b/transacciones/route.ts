@@ -9,5 +9,5 @@ export const runtime = "nodejs";
 export const GET = ruta(async () => {
   const u = await requerirRol("beneficiario");
   const txs = await ctx().repo.transaccionesDeUsuario(u.id);
-  return NextResponse.json({ transacciones: await Promise.all(txs.slice(0, 50).map((t) => vistaTransaccion(t, u))) });
+  return NextResponse.json({ transacciones: await Promise.all(txs.slice(0, 50).map((t) => vistaTransaccion(t))) });
 });

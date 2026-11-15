@@ -5,7 +5,7 @@ import { guardiaRol } from "@/lib/server/guardia";
 export const dynamic = "force-dynamic";
 
 const NAV: ItemNav[] = [
-  { href: "/c", etiqueta: "Escanear", icono: "escanear", exacto: true },
+  { href: "/c", etiqueta: "Cobrar", icono: "cobrar", exacto: true },
   { href: "/c/corte", etiqueta: "Corte del día", icono: "corte" },
 ];
 

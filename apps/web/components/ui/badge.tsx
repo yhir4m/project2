@@ -9,7 +9,7 @@ const badge = cva("inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm
       exito: "bg-exito-fondo text-exito",
       error: "bg-error-fondo text-error",
       aviso: "bg-aviso-fondo text-aviso",
-      primario: "bg-primario/10 text-primario",
+      primario: "bg-primario/10 text-acento",
     },
   },
   defaultVariants: { tono: "neutro" },

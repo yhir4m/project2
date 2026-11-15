@@ -9,11 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primario: "bg-primario text-primario-texto shadow-sm hover:brightness-110",
+        primario: "bg-primario text-primario-texto shadow-sm hover:brightness-105",
         secundario: "border-2 border-borde bg-superficie text-texto hover:bg-fondo",
-        exito: "bg-exito text-white shadow-sm hover:brightness-110 dark:text-fondo",
+        exito: "bg-accion text-accion-texto shadow-sm hover:brightness-105",
         peligro: "bg-error text-white hover:brightness-110 dark:text-fondo",
-        fantasma: "text-primario hover:bg-primario/10",
+        fantasma: "text-acento hover:bg-primario/10",
       },
       size: {
         md: "min-h-12 px-5 text-base",

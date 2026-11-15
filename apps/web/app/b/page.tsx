@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Bell, ChevronRight, Clock, Phone, Plus, QrCode, ShieldCheck, Store } from "lucide-react";
+import { Bell, ChevronRight, Clock, Phone, Plus, ScanLine, ShieldCheck, Store } from "lucide-react";
 import Link from "next/link";
 import { BotonSalir, Contenido, Encabezado } from "@/components/app-shell";
 import { ErrorEstado, Esqueleto, Vacio } from "@/components/estados";
@@ -43,9 +43,9 @@ export default function Cartera() {
       />
       <Contenido>
         {yo.data && !yo.data.tiene_celular && activas.length > 0 ? (
-          <Link href="/b/perfil#celular" className="flex items-center gap-3 rounded-xl bg-primario/10 p-4 text-primario">
+          <Link href="/b/perfil#celular" className="flex items-center gap-3 rounded-xl bg-primario/10 p-4 text-acento">
             <Phone className="size-6 shrink-0" aria-hidden />
-            <span className="flex-1 font-semibold">Agrega tu celular para recibir el cobro CoDi directo en tu banco.</span>
+            <span className="flex-1 font-semibold">Agrega tu celular: el cobro CoDi te llega directo a tu app bancaria.</span>
             <ChevronRight className="size-5" aria-hidden />
           </Link>
         ) : null}
@@ -102,8 +102,8 @@ export default function Cartera() {
                 <div className="px-4 pb-4">
                   {c.estado === "activa" ? (
                     <Button asChild size="xl">
-                      <Link href={`/b/qr?c=${c.id}`}>
-                        <QrCode /> Mostrar mi QR
+                      <Link href="/b/pagar">
+                        <ScanLine /> Pagar con descuento
                       </Link>
                     </Button>
                   ) : (

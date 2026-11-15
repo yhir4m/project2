@@ -8,6 +8,7 @@ import type { Ticket } from "@cdv/core";
 
 export interface VistaTx {
   id: string;
+  solicitud_id: string | null;
   estado: "creando" | "pendiente" | "incierta" | "pagada" | "expirada" | "cancelada" | "fallida";
   metodo: "codi" | "efectivo";
   canal: "pn" | "qr" | null;
@@ -22,7 +23,6 @@ export interface VistaTx {
   pagada_en: string | null;
   created_at: string;
   pey_id: string | null;
-  qr_cobro: string | null;
   ticket: Ticket | null;
   simulado: boolean;
 }

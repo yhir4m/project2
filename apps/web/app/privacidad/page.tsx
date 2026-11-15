@@ -29,7 +29,7 @@ export default function Privacidad() {
       </p>
       <h2 className="text-xl font-bold">Tus derechos ARCO</h2>
       <p>Puedes acceder, rectificar, cancelar u oponerte al uso de tus datos y revocar tu consentimiento escribiendo al equipo responsable.</p>
-      <Link href="/" className="inline-flex min-h-12 items-center font-semibold text-primario underline">
+      <Link href="/" className="inline-flex min-h-12 items-center font-semibold text-acento underline">
         Volver
       </Link>
     </main>

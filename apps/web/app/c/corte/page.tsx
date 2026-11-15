@@ -36,7 +36,7 @@ export default function CorteDelDia() {
               <Dato titulo="Descuentos dados" valor={mxn(q.data!.resumen.descuento_centavos)} className="col-span-2" />
             </div>
             {q.data!.transacciones.length ? (
-              <ListaTransacciones txs={q.data!.transacciones} href={(t) => `/c/cobro/${t.id}`} />
+              <ListaTransacciones txs={q.data!.transacciones} href={(t) => (t.solicitud_id ? `/c/cobro/${t.solicitud_id}` : "/c/corte")} />
             ) : (
               <Vacio titulo="Sin ventas hoy" icono={<Receipt />}>Aquí verás cada cobro con descuento.</Vacio>
             )}

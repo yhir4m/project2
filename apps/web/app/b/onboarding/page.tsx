@@ -14,6 +14,7 @@ import { Cargando, ErrorEstado } from "@/components/estados";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Ayuda, Input, Label } from "@/components/ui/input";
+import { CelularForm } from "@/components/celular-form";
 import { useActualizarYo, useYo } from "@/hooks/use-yo";
 import { api, ErrorApi } from "@/lib/api";
 
@@ -103,7 +104,7 @@ function Opcion({ icono, titulo, texto, onClick }: { icono: React.ReactNode; tit
   return (
     <button onClick={onClick} className="w-full text-left">
       <Card className="flex min-h-16 items-start gap-3 active:bg-fondo">
-        <span className="mt-0.5 text-primario [&_svg]:size-7">{icono}</span>
+        <span className="mt-0.5 text-acento [&_svg]:size-7">{icono}</span>
         <span>
           <span className="block text-lg font-bold">{titulo}</span>
           <span className="block text-texto-suave">{texto}</span>
@@ -118,7 +119,7 @@ function Consentimiento({ onListo }: { onListo: () => void }) {
   const [acepto, setAcepto] = useState(false);
   return (
     <>
-      <div className="grid size-16 place-items-center rounded-full bg-primario/10 text-primario">
+      <div className="grid size-16 place-items-center rounded-full bg-primario/10 text-acento">
         <ShieldCheck className="size-8" aria-hidden />
       </div>
       <h2 className="text-2xl font-bold">Tus datos, protegidos</h2>
@@ -129,10 +130,10 @@ function Consentimiento({ onListo }: { onListo: () => void }) {
         <li>El negocio solo ve “descuento válido”.</li>
       </ul>
       <label className="flex min-h-14 cursor-pointer items-start gap-3 rounded-xl border-2 border-borde bg-superficie p-4">
-        <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} className="mt-1 size-6 accent-[var(--primario)]" />
+        <input type="checkbox" checked={acepto} onChange={(e) => setAcepto(e.target.checked)} className="mt-1 size-6 accent-[var(--acento)]" />
         <span>
           Leí y acepto el{" "}
-          <Link href="/privacidad" className="font-semibold text-primario underline">
+          <Link href="/privacidad" className="font-semibold text-acento underline">
             aviso de privacidad
           </Link>
           .
@@ -237,7 +238,7 @@ function PasoDocumento({ emisor, onResultado }: { emisor: EmisorOpcion; onResult
         <Input id="nombre" autoComplete="name" aria-invalid={Boolean(f.formState.errors.nombre)} placeholder={yo.data?.nombre ?? ""} {...f.register("nombre")} />
         {f.formState.errors.nombre ? <Ayuda error>{f.formState.errors.nombre.message}</Ayuda> : null}
       </div>
-      <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primario/50 bg-primario/5 p-4 text-center text-primario">
+      <label className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-acento/50 bg-primario/5 p-4 text-center text-acento">
         <Camera className="size-10" aria-hidden />
         <span className="text-lg font-bold">{archivo ? archivo.name : "Tomar o subir foto"}</span>
         <span className="text-sm text-texto-suave">JPG o PNG. Que se lea bien y sin reflejos.</span>
@@ -251,7 +252,7 @@ function PasoDocumento({ emisor, onResultado }: { emisor: EmisorOpcion; onResult
 
 function Resultado({ estado, onReintentar }: { estado: "aprobada" | "rechazada" | "revision_manual"; onReintentar: () => void }) {
   const cfg = {
-    aprobada: { Icono: CheckCircle2, color: "text-exito bg-exito-fondo", titulo: "¡Listo! Ya tienes tu credencial", texto: "Úsala con tu código QR en los negocios con convenio." },
+    aprobada: { Icono: CheckCircle2, color: "text-exito bg-exito-fondo", titulo: "¡Listo! Ya tienes tu credencial", texto: "Al pagar, escanea el código del negocio y tu descuento se aplica solo." },
     revision_manual: { Icono: Clock, color: "text-aviso bg-aviso-fondo", titulo: "Tu documento está en revisión", texto: "Una persona de tu institución lo revisará. Te avisaremos aquí." },
     rechazada: { Icono: XCircle, color: "text-error bg-error-fondo", titulo: "No pudimos aprobarlo", texto: "El documento no es vigente o no es del tipo correcto. Intenta con otro." },
   }[estado];
@@ -263,12 +264,30 @@ function Resultado({ estado, onReintentar }: { estado: "aprobada" | "rechazada" 
       <h2 className="text-2xl font-bold">{cfg.titulo}</h2>
       <p className="text-lg text-texto-suave">{cfg.texto}</p>
       {estado === "aprobada" ? (
-        <Button asChild size="xl"><Link href="/b/qr">Ver mi QR</Link></Button>
+        <PasoCelularYPagar />
       ) : estado === "rechazada" ? (
         <Button onClick={onReintentar}>Intentar de nuevo</Button>
       ) : (
         <Button asChild variant="secundario"><Link href="/b">Volver a mi cartera</Link></Button>
       )}
     </div>
+  );
+}
+
+/** Tras aprobar: pedir celular (CoDi llega a su app bancaria) y llevar a Pagar. */
+function PasoCelularYPagar() {
+  const yo = useYo();
+  if (yo.data && !yo.data.tiene_celular) {
+    return (
+      <div className="w-full space-y-3 text-left">
+        <p className="font-bold">Último paso: tu celular</p>
+        <CelularForm boton="Guardar celular" />
+      </div>
+    );
+  }
+  return (
+    <Button asChild size="xl">
+      <Link href="/b/pagar">Ir a pagar con descuento</Link>
+    </Button>
   );
 }

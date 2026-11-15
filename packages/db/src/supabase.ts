@@ -12,6 +12,7 @@ import type {
   Notificacion,
   Perfil,
   Producto,
+  SolicitudCobro,
   Transaccion,
   Verificacion,
   WebhookEvento,
@@ -69,6 +70,14 @@ const aTransaccion = (r: Tables<"transacciones">): Transaccion => ({
   monto_cobrado_centavos: Number(r.monto_cobrado_centavos),
   expira_en: dn(r.expira_en),
   pagada_en: dn(r.pagada_en),
+  created_at: d(r.created_at),
+  updated_at: d(r.updated_at),
+});
+const aSolicitud = (r: Tables<"solicitudes_cobro">): SolicitudCobro => ({
+  ...r,
+  compra: r.compra as unknown as Compra,
+  total_centavos: Number(r.total_centavos),
+  expira_en: d(r.expira_en),
   created_at: d(r.created_at),
   updated_at: d(r.updated_at),
 });
@@ -340,6 +349,49 @@ export class RepositorioSupabase implements Repositorio {
       await this.db.rpc("rl_consumir", { p_clave: clave, p_limite: limite, p_ventana_seg: ventanaSeg }),
       "rateLimit",
     );
+  }
+
+  // ---------- Solicitudes de cobro ----------
+  async crearSolicitud(x: Parameters<Repositorio["crearSolicitud"]>[0]) {
+    const r = ok(
+      await this.db
+        .from("solicitudes_cobro")
+        .insert({
+          comercio_id: x.comercio_id,
+          compra: x.compra as unknown as Database["public"]["Tables"]["solicitudes_cobro"]["Insert"]["compra"],
+          total_centavos: x.total_centavos,
+          expira_en: x.expira_en.toISOString(),
+        })
+        .select("*")
+        .single(),
+      "crearSolicitud",
+    );
+    return aSolicitud(r);
+  }
+  async solicitud(id: string) {
+    const r = opt(await this.db.from("solicitudes_cobro").select("*").eq("id", id).maybeSingle(), "solicitud");
+    return r ? aSolicitud(r) : null;
+  }
+  async tomarSolicitud(id: string) {
+    const r = ok(await this.db.rpc("tomar_solicitud", { p_id: id }), "tomarSolicitud");
+    return r[0] ? aSolicitud(r[0]) : null;
+  }
+  async actualizarSolicitud(
+    id: string,
+    desde: readonly SolicitudCobro["estado"][],
+    cambios: Parameters<Repositorio["actualizarSolicitud"]>[2],
+  ) {
+    const r = opt(
+      await this.db
+        .from("solicitudes_cobro")
+        .update(cambios)
+        .eq("id", id)
+        .in("estado", [...desde])
+        .select("*")
+        .maybeSingle(),
+      "actualizarSolicitud",
+    );
+    return r ? aSolicitud(r) : null;
   }
 
   // ---------- Transacciones ----------

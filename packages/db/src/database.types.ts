@@ -288,6 +288,42 @@ export type Database = {
         Update: { clave?: string; conteo?: number; ventana?: string };
         Relationships: [];
       };
+      solicitudes_cobro: {
+        Row: {
+          comercio_id: string;
+          compra: Json;
+          created_at: string;
+          estado: Database["public"]["Enums"]["estado_solicitud"];
+          expira_en: string;
+          id: string;
+          total_centavos: number;
+          transaccion_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          comercio_id: string;
+          compra: Json;
+          created_at?: string;
+          estado?: Database["public"]["Enums"]["estado_solicitud"];
+          expira_en: string;
+          id?: string;
+          total_centavos: number;
+          transaccion_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          comercio_id?: string;
+          compra?: Json;
+          created_at?: string;
+          estado?: Database["public"]["Enums"]["estado_solicitud"];
+          expira_en?: string;
+          id?: string;
+          total_centavos?: number;
+          transaccion_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       transacciones: {
         Row: {
           canal: Database["public"]["Enums"]["canal_codi"] | null;
@@ -312,6 +348,7 @@ export type Database = {
           pey_num_ref: string | null;
           pey_qr_string: string | null;
           precio_original_centavos: number;
+          solicitud_id: string | null;
           updated_at: string;
         };
         Insert: {
@@ -337,6 +374,7 @@ export type Database = {
           pey_num_ref?: string | null;
           pey_qr_string?: string | null;
           precio_original_centavos: number;
+          solicitud_id?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -362,6 +400,7 @@ export type Database = {
           pey_num_ref?: string | null;
           pey_qr_string?: string | null;
           precio_original_centavos?: number;
+          solicitud_id?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -487,12 +526,17 @@ export type Database = {
         Args: never;
         Returns: { estado: Database["public"]["Enums"]["estado_credencial"]; tipo_beneficiario: string; total: number }[];
       };
+      tomar_solicitud: {
+        Args: { p_id: string };
+        Returns: Database["public"]["Tables"]["solicitudes_cobro"]["Row"][];
+      };
       rl_consumir: { Args: { p_clave: string; p_limite: number; p_ventana_seg: number }; Returns: boolean };
       usos_hoy: { Args: { p_convenio_id: string; p_credencial_id: string }; Returns: number };
     };
     Enums: {
       canal_codi: "pn" | "qr";
       estado_credencial: "activa" | "revocada" | "vencida";
+      estado_solicitud: "abierta" | "tomada" | "pagada" | "cancelada" | "expirada";
       estado_transaccion: "creando" | "pendiente" | "incierta" | "pagada" | "expirada" | "cancelada" | "fallida";
       estado_verificacion: "pendiente" | "aprobada" | "rechazada" | "revision_manual";
       metodo_pago: "codi" | "efectivo";

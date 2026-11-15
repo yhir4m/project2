@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const NAV: ItemNav[] = [
   { href: "/b", etiqueta: "Cartera", icono: "cartera", exacto: true },
-  { href: "/b/qr", etiqueta: "Mi QR", icono: "qr" },
+  { href: "/b/pagar", etiqueta: "Pagar", icono: "escanear" },
   { href: "/b/historial", etiqueta: "Historial", icono: "historial" },
   { href: "/b/perfil", etiqueta: "Perfil", icono: "perfil" },
 ];

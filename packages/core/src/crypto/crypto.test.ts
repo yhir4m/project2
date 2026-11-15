@@ -1,13 +1,7 @@
 import { generateKeyPair, type CryptoKey } from "jose";
 import { beforeAll, describe, expect, it } from "vitest";
 import { firmarCredencial, verificarCredencial } from "./credential";
-import {
-  firmarQr,
-  verificarQr,
-  type CredencialEstado,
-  type DependenciasVerificacionQr,
-} from "./qr-token";
-import { nonceAleatorio } from "./random";
+import { COBRO_PREFIJO, COBRO_TTL_SEGUNDOS, firmarCobro, leerCobro } from "./cobro-token";
 
 let priv: CryptoKey;
 let pub: CryptoKey;
@@ -83,150 +77,45 @@ describe("credencial firmada", () => {
   });
 });
 
-describe("QR dinámico", () => {
-  const DEV = "d".repeat(43);
-  const cred: CredencialEstado = {
-    id: "cred-1",
-    emisor_id: "uttab",
-    seudonimo: "ps_abc",
-    estado: "activa",
-    vigente_hasta: VENCE,
-    dispositivo_hash: DEV,
-  };
+describe("QR de cobro del comercio", () => {
+  const secreto = new TextEncoder().encode("s".repeat(48));
+  const otro = new TextEncoder().encode("x".repeat(48));
+  const SID = "4f1c2b8e-1111-4222-8333-444455556666";
+  const COM = "a0000000-0000-4000-8000-000000000001";
+  const EXP = new Date(T0.getTime() + COBRO_TTL_SEGUNDOS * 1000);
 
-  function deps(
-    over: Partial<CredencialEstado> = {},
-    conConvenio = true,
-  ): DependenciasVerificacionQr & { usados: Set<string> } {
-    const usados = new Set<string>();
-    return {
-      usados,
-      resolverLlave: resolver,
-      obtenerCredencial: async (id) => (id === cred.id ? { ...cred, ...over } : null),
-      buscarConvenio: async ({ comercioId }) =>
-        conConvenio && comercioId === "com-1" ? { id: "conv-1", nombre: "UTTAB 10%" } : null,
-      consumirNonce: async (n) => (usados.has(n) ? false : (usados.add(n), true)),
-    };
-  }
-
-  const emitir = (ahora = T0, extra: Partial<Parameters<typeof firmarQr>[0]> = {}) =>
-    firmarQr(
-      {
-        emisorId: "uttab",
-        seudonimo: "ps_abc",
-        credencialId: "cred-1",
-        tipoBeneficiario: "estudiante",
-        dispositivoHash: DEV,
-        nonce: nonceAleatorio(),
-        credencialVenceEn: VENCE,
-        ahora,
-        ...extra,
-      },
-      priv,
-    );
-
-  it("acepta un QR válido una sola vez (antirreplay)", async () => {
-    const { token, exp } = await emitir();
-    expect(exp - T0.getTime() / 1000).toBe(45);
-    const d = deps();
-    const r1 = await verificarQr(token, "com-1", d, { ahora: new Date(T0.getTime() + 10_000) });
-    expect(r1.ok && r1.convenio.id).toBe("conv-1");
-    const r2 = await verificarQr(token, "com-1", d, { ahora: new Date(T0.getTime() + 11_000) });
-    expect(r2).toEqual({ ok: false, error: "qr_ya_usado" });
+  it("firma y lee una solicitud válida", async () => {
+    const qr = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: EXP, ahora: T0 }, secreto);
+    expect(qr.startsWith(COBRO_PREFIJO)).toBe(true);
+    const r = await leerCobro(qr, secreto, { ahora: new Date(T0.getTime() + 60_000) });
+    expect(r.ok && r.claims).toMatchObject({ sid: SID, com: COM });
   });
 
   it("rechaza QR expirado", async () => {
-    const { token } = await emitir();
-    expect(
-      await verificarQr(token, "com-1", deps(), { ahora: new Date(T0.getTime() + 60_000) }),
-    ).toEqual({ ok: false, error: "expirado" });
+    const qr = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: EXP, ahora: T0 }, secreto);
+    expect(await leerCobro(qr, secreto, { ahora: new Date(EXP.getTime() + 60_000) })).toEqual({ ok: false, error: "expirado" });
   });
 
-  it("rechaza credencial revocada", async () => {
-    const { token } = await emitir();
-    expect(await verificarQr(token, "com-1", deps({ estado: "revocada" }), { ahora: T0 })).toEqual({
-      ok: false,
-      error: "credencial_revocada",
-    });
+  it("rechaza firma de otro secreto y QR alterado", async () => {
+    const qr = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: EXP, ahora: T0 }, otro);
+    expect(await leerCobro(qr, secreto, { ahora: T0 })).toEqual({ ok: false, error: "firma_invalida" });
+    const bueno = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: EXP, ahora: T0 }, secreto);
+    const [pre, h, p, s] = bueno.split(".");
+    const payload = JSON.parse(Buffer.from(p!, "base64url").toString());
+    payload.com = "a0000000-0000-4000-8000-000000000002";
+    const alterado = `${pre}.${h}.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.${s}`;
+    expect((await leerCobro(alterado, secreto, { ahora: T0 })).ok).toBe(false);
   });
 
-  it("rechaza credencial vencida en BD aunque el QR sea vigente", async () => {
-    const { token } = await emitir();
-    expect(
-      await verificarQr(token, "com-1", deps({ vigente_hasta: new Date(T0.getTime() - 1) }), {
-        ahora: T0,
-      }),
-    ).toEqual({ ok: false, error: "credencial_vencida" });
+  it("rechaza contenido ajeno y TTL excesivo", async () => {
+    expect(await leerCobro("https://ejemplo.com", secreto)).toEqual({ ok: false, error: "no_es_cobro" });
+    const largo = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: new Date(T0.getTime() + 3_600_000), ahora: T0 }, secreto);
+    expect(await leerCobro(largo, secreto, { ahora: T0 })).toEqual({ ok: false, error: "firma_invalida" });
   });
 
-  it("rechaza QR de otro dispositivo", async () => {
-    const { token } = await emitir(T0, { dispositivoHash: "x".repeat(43) });
-    expect(await verificarQr(token, "com-1", deps(), { ahora: T0 })).toEqual({
-      ok: false,
-      error: "dispositivo_no_coincide",
-    });
-  });
-
-  it("rechaza comercio sin convenio y NO quema el nonce", async () => {
-    const { token } = await emitir();
-    const d = deps({}, false);
-    expect(await verificarQr(token, "com-2", d, { ahora: T0 })).toEqual({
-      ok: false,
-      error: "sin_convenio",
-    });
-    expect(d.usados.size).toBe(0);
-  });
-
-  it("rechaza firma inválida y contenido ajeno", async () => {
-    const { token } = await firmarQr(
-      {
-        emisorId: "uttab",
-        seudonimo: "ps_abc",
-        credencialId: "cred-1",
-        tipoBeneficiario: "estudiante",
-        dispositivoHash: DEV,
-        nonce: nonceAleatorio(),
-        credencialVenceEn: VENCE,
-        ahora: T0,
-      },
-      otraPriv,
-    );
-    expect(await verificarQr(token, "com-1", deps(), { ahora: T0 })).toEqual({
-      ok: false,
-      error: "firma_invalida",
-    });
-    expect(await verificarQr("https://example.com", "com-1", deps())).toEqual({
-      ok: false,
-      error: "no_es_qr_del_sistema",
-    });
-  });
-
-  it("rechaza QR con TTL mayor al permitido", async () => {
-    const { token } = await emitir(T0, { ttlSeg: 3600 });
-    expect(await verificarQr(token, "com-1", deps(), { ahora: T0 })).toEqual({
-      ok: false,
-      error: "formato_invalido",
-    });
-  });
-
-  it("el QR no vive más que la credencial", async () => {
-    const { exp } = await emitir(T0, { credencialVenceEn: new Date(T0.getTime() + 10_000) });
-    expect(exp).toBe(T0.getTime() / 1000 + 10);
-  });
-
-  it("el QR no contiene datos personales", async () => {
-    const { token } = await emitir();
-    const payload = JSON.parse(Buffer.from(token.split(".")[2]!, "base64url").toString());
-    expect(Object.keys(payload).sort()).toEqual([
-      "cid",
-      "dev",
-      "exp",
-      "iat",
-      "iss",
-      "jti",
-      "sub",
-      "tb",
-      "typ",
-    ]);
+  it("el QR no contiene montos ni datos personales", async () => {
+    const qr = await firmarCobro({ solicitudId: SID, comercioId: COM, expiraEn: EXP, ahora: T0 }, secreto);
+    const payload = JSON.parse(Buffer.from(qr.split(".")[2]!, "base64url").toString());
+    expect(Object.keys(payload).sort()).toEqual(["com", "exp", "iat", "sid", "typ"]);
   });
 });

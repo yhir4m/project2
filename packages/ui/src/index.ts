@@ -2,36 +2,47 @@
  * Tokens de diseño compartibles entre la web (Tailwind/CSS vars) y la futura app Expo (StyleSheet).
  * Alto contraste (WCAG AA ≥ 4.5:1 en texto normal) y tipografía base ≥ 18 px.
  */
+/** Paleta "hirashi" (dorado, crema, pizarra) con ajustes de contraste WCAG AA. */
 export const colores = {
-  fondo: "#F7F7F4",
+  fondo: "#F7F3EB",
   superficie: "#FFFFFF",
-  texto: "#14171A",
-  textoSuave: "#4A5260",
-  borde: "#D5D9DF",
-  primario: "#0B5FFF", // contraste 5.0:1 sobre blanco
-  primarioTexto: "#FFFFFF",
-  exito: "#0A7A3B",
-  exitoFondo: "#E5F5EC",
-  error: "#B42318",
-  errorFondo: "#FDECEA",
+  superficie2: "#F1EDE4",
+  texto: "#1F1F1F",
+  textoSuave: "#5C5C5C",
+  borde: "#E3DED1",
+  primario: "#C5A358", // fondo de botones; texto encima = primarioTexto (6.9:1)
+  primarioTexto: "#1F1F1F",
+  acento: "#766134", // dorado para texto/íconos sobre crema (5.4:1)
+  accion: "#00D084", // pagar/confirmar; texto encima = accionTexto (7.7:1)
+  accionTexto: "#1A252B",
+  pizarra: "#1A252B",
+  exito: "#3A6B4F",
+  exitoFondo: "#E6EFE9",
+  error: "#AF3030",
+  errorFondo: "#F7E4E1",
   aviso: "#8A5300",
-  avisoFondo: "#FFF4DB",
+  avisoFondo: "#FBEFD9",
 } as const;
 
 export const coloresOscuro = {
-  fondo: "#0E1116",
-  superficie: "#171B22",
-  texto: "#F2F4F7",
-  textoSuave: "#B4BCC8",
-  borde: "#2C333D",
-  primario: "#5B93FF",
-  primarioTexto: "#0E1116",
-  exito: "#3DD68C",
-  exitoFondo: "#0F2A1C",
-  error: "#FF8A80",
-  errorFondo: "#3A1512",
-  aviso: "#FFC861",
-  avisoFondo: "#332508",
+  fondo: "#121A1E",
+  superficie: "#1A252B",
+  superficie2: "#223037",
+  texto: "#F7F3EB",
+  textoSuave: "#C4BCAD",
+  borde: "#2E3A40",
+  primario: "#C5A358",
+  primarioTexto: "#1A252B",
+  acento: "#D9BD7C",
+  accion: "#00D084",
+  accionTexto: "#0E1A14",
+  pizarra: "#1A252B",
+  exito: "#7CC49A",
+  exitoFondo: "#15291E",
+  error: "#EC8A7F",
+  errorFondo: "#3A1714",
+  aviso: "#F0C46A",
+  avisoFondo: "#33270E",
 } as const;
 
 /** Tamaños en px. `base` ≥ 18 por accesibilidad (adultos mayores). */

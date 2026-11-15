@@ -118,6 +118,7 @@ export interface Credencial {
 export interface Transaccion {
   id: string;
   idempotency_key: string;
+  solicitud_id: string | null;
   comercio_id: string;
   credencial_id: string;
   convenio_id: string;
@@ -137,6 +138,21 @@ export interface Transaccion {
   expira_en: Date | null;
   pagada_en: Date | null;
   error: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type EstadoSolicitud = "abierta" | "tomada" | "pagada" | "cancelada" | "expirada";
+
+/** Cobro que inicia el comercio (su QR en pantalla); el cliente lo escanea para pagar. */
+export interface SolicitudCobro {
+  id: string;
+  comercio_id: string;
+  compra: Compra;
+  total_centavos: number;
+  estado: EstadoSolicitud;
+  transaccion_id: string | null;
+  expira_en: Date;
   created_at: Date;
   updated_at: Date;
 }

@@ -12,7 +12,17 @@ type Detener = () => void;
  * Motor principal: @zxing/browser. Respaldo: BarcodeDetector nativo (si existe).
  * Requiere HTTPS (o localhost) para acceder a la cámara.
  */
-export function Escaner({ onLeer, pausado, permitirPegar }: { onLeer: (texto: string) => void; pausado: boolean; permitirPegar?: boolean }) {
+export function Escaner({
+  onLeer,
+  pausado,
+  permitirPegar,
+  indicacion = "Apunta al código QR",
+}: {
+  onLeer: (texto: string) => void;
+  pausado: boolean;
+  permitirPegar?: boolean;
+  indicacion?: string;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState("");
@@ -108,7 +118,7 @@ export function Escaner({ onLeer, pausado, permitirPegar }: { onLeer: (texto: st
           </div>
         ) : null}
         <p className="absolute inset-x-0 bottom-3 text-center text-base font-semibold text-white drop-shadow">
-          Apunta al código QR del cliente
+          {indicacion}
         </p>
       </div>
       {permitirPegar ? (

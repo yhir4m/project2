@@ -75,7 +75,7 @@ export function SelectorRol({ demo }: { demo: boolean }) {
               aria-labelledby={`rol-${rol}`}
             >
               <div className="mb-2 flex items-center gap-3">
-                <Icono className="size-7 text-primario" aria-hidden />
+                <Icono className="size-7 text-acento" aria-hidden />
                 <div>
                   <h2 id={`rol-${rol}`} className="text-xl font-bold">{titulo}</h2>
                   <p className="text-sm text-texto-suave">{texto}</p>
@@ -94,7 +94,7 @@ export function SelectorRol({ demo }: { demo: boolean }) {
                         {u.detalle ? <span className="block text-sm text-texto-suave">{u.detalle}</span> : null}
                       </span>
                       {entrando === u.id ? (
-                        <span className="size-6 animate-spin rounded-full border-2 border-primario border-r-transparent" />
+                        <span className="size-6 animate-spin rounded-full border-2 border-acento border-r-transparent" />
                       ) : (
                         <ChevronRight className="size-6 text-texto-suave" aria-hidden />
                       )}
@@ -104,11 +104,11 @@ export function SelectorRol({ demo }: { demo: boolean }) {
               </ul>
             </motion.section>
           ))}
-          <a href="/entrar" className="flex min-h-14 items-center justify-center rounded-xl border-2 border-primario font-semibold text-primario">
+          <a href="/entrar" className="flex min-h-14 items-center justify-center rounded-xl border-2 border-acento font-semibold text-acento">
             Entrar con mi correo
           </a>
           <p className="text-center text-sm text-texto-suave">
-            Al continuar aceptas el <a className="font-semibold text-primario underline" href="/privacidad">aviso de privacidad</a>.
+            Al continuar aceptas el <a className="font-semibold text-acento underline" href="/privacidad">aviso de privacidad</a>.
           </p>
         </div>
       )}

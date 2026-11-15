@@ -13,5 +13,5 @@ export const GET = ruta(async (_req: Request, { params }: { params: Promise<{ id
   const tx = await ctx().repo.transaccion(id);
   if (!tx || !(await puedeVerTransaccion(tx, u))) return error(404, "no_encontrada", "No encontramos el cobro.");
   const actual = await refrescarTransaccion(tx);
-  return NextResponse.json({ transaccion: await vistaTransaccion(actual, u) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ transaccion: await vistaTransaccion(actual) }, { headers: { "Cache-Control": "no-store" } });
 });
