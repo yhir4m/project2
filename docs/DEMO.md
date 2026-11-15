@@ -14,7 +14,7 @@
 2. Pantalla: *Café latte $48 · Con descuento UTTAB 20 % → **$38.40***. "El precio lo fijó el negocio; el descuento depende de quién paga."
 3. **Pagar con CoDi** → llega la notificación a la app bancaria → autorizar.
 4. Ambas pantallas muestran el **ticket** al instante: precio, descuento, convenio, ID de Pey.
-5. "Por modo prueba se cobraron $0.10 reales vía CoDi; el ticket muestra el desglose real."
+5. "Por modo prueba se cobraron $0.01 reales vía CoDi; el ticket muestra el desglose real."
 
 **Contraste (opcional, 15 s):** el mismo QR escaneado por **Pedro (público general)** → $48.00 sin descuento.
 

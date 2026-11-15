@@ -71,22 +71,35 @@ export async function confirmarEfectivo(id: string, comercioId: string) {
 
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
-/** Acepta el enlace del QR (`https://…/pagar/p/<id>`) o solo el id del producto. */
+/**
+ * Lee el QR del negocio de forma tolerante: busca el primer id (UUID) en CUALQUIER texto escaneado
+ * (enlace completo, con o sin parámetros, mayúsculas, solo el id…). Si es un producto activo → ese QR.
+ */
 async function productoDesdeQr(contenido: string) {
   const raw = contenido.trim();
-  const id = raw.match(/\/pagar\/p\/([0-9a-f-]{36})/i)?.[1] ?? (raw.length === 36 && UUID.test(raw) ? raw : null);
+  const { repo } = ctx();
+  let id = raw.match(UUID)?.[0]?.toLowerCase() ?? null;
   if (!id) {
-    // Diagnóstico en los logs (sin datos personales: es el texto del QR escaneado).
-    console.warn("[qr] contenido no reconocido:", JSON.stringify(raw.slice(0, 120)));
-    if (/\/pagar\/[0-9a-f-]{36}/i.test(raw) || raw.startsWith("CDVC1.")) {
+    try {
+      id = decodeURIComponent(raw).match(UUID)?.[0]?.toLowerCase() ?? null;
+    } catch {
+      /* texto no decodificable */
+    }
+  }
+  if (!id) {
+    console.warn("[qr] contenido sin id:", JSON.stringify(raw.slice(0, 160)));
+    throw new ErrorHttp(422, "no_es_cobro", "Este no es un código de cobro de un negocio afiliado.");
+  }
+  const producto = await repo.producto(id);
+  if (!producto) {
+    console.warn("[qr] id no es un producto:", id, JSON.stringify(raw.slice(0, 160)));
+    if (await repo.solicitud(id)) {
       throw new ErrorHttp(422, "qr_anterior", "Este QR es de una versión anterior. Escanea un QR de “Mis QR” del negocio.");
     }
     throw new ErrorHttp(422, "no_es_cobro", "Este no es un código de cobro de un negocio afiliado.");
   }
-  const { repo } = ctx();
-  const producto = await repo.producto(id);
-  const comercio = producto ? await repo.comercio(producto.comercio_id) : null;
-  if (!producto || !producto.activo || !comercio || !comercio.activo) {
+  const comercio = await repo.comercio(producto.comercio_id);
+  if (!producto.activo || !comercio || !comercio.activo) {
     throw new ErrorHttp(404, "qr_inactivo", "Este código ya no está activo. Pide al negocio el código vigente.");
   }
   return { producto, comercio };

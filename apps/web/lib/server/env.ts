@@ -21,7 +21,7 @@ const EnvSchema = z
 
     // Pagos (Pey solo tiene producción; por defecto se cobra un monto simbólico)
     MODO_PRUEBA: bool(true),
-    MONTO_PRUEBA_MXN: z.coerce.number().positive().max(10).default(0.1),
+    MONTO_PRUEBA_MXN: z.coerce.number().positive().max(10).default(0.01),
     PEY_API_KEY: z.string().min(10).optional(),
     PEY_WEBHOOK_SECRET: z.string().startsWith("whsec_").optional(),
     PEY_BASE_URL: z.string().url().optional(),

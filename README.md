@@ -68,7 +68,7 @@ openssl rand -base64 48              # pégalo en VERIFICACION_SECRET
 | `ISSUER_<ID>_PRIVATE_KEY` / `_PUBLIC_KEY` | `pnpm keys:generate -- <id>` | Sí, una por emisor |
 | `PEY_API_KEY`, `PEY_WEBHOOK_SECRET` | portal.mipey.mx → Desarrollador | Sí, salvo `PEY_SIMULADO=true` |
 | `PEY_SIMULADO` | `true` solo para desarrollar sin API key (no mueve dinero) | No |
-| `MODO_PRUEBA`, `MONTO_PRUEBA_MXN` | Por defecto `true` y `0.10`: se cobran $0.10 reales en lugar del total | No |
+| `MODO_PRUEBA`, `MONTO_PRUEBA_MXN` | Por defecto `true` y `0.01`: se cobran $0.01 reales en lugar del total | No |
 | `XAI_API_KEY`, `XAI_MODEL` | console.x.ai (`grok-4.7`). Sin llave, los documentos van a revisión manual | No |
 | `DEMO_MODE` | `true` muestra el selector de rol con usuarios demo | No |
 
@@ -98,7 +98,7 @@ Guion completo de la demo: [`docs/DEMO.md`](docs/DEMO.md).
 1. En la computadora entra como **Comercio · Negocio de Ramón Orraca** → **Mis QR** → abre "Café latte $48" (o crea uno nuevo con su precio).
 2. En el celular (por la URL `https://`) escanea el QR con la **cámara normal** y toca el enlace.
 3. Elige quién paga: **Luis** (estudiante, 20 % en café), **Carmen** (INAPAM, 15 %) o **Pedro** (público general, sin descuento).
-4. Registra tu celular con CoDi cuando lo pida y toca **Pagar con CoDi**. Con `MODO_PRUEBA=true` se cobran **$0.10 reales**; el ticket muestra el desglose completo.
+4. Registra tu celular con CoDi cuando lo pida y toca **Pagar con CoDi**. Con `MODO_PRUEBA=true` se cobran **$0.01 reales**; el ticket muestra el desglose completo.
 5. Autoriza en tu app bancaria. En el negocio, **Pagos de hoy** muestra el pago al instante.
 6. **Efectivo:** "Pagaré en efectivo" → el negocio toca **"Recibí el efectivo"**.
 
