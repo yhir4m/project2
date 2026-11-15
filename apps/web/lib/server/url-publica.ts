@@ -1,4 +1,5 @@
 import "server-only";
+import { urlCanonica } from "@/lib/dominio";
 import { env } from "./env";
 
 const esLocal = (host: string) => /^(localhost|127\.|0\.0\.0\.0|\[?::1\]?)/i.test(host);
@@ -27,6 +28,8 @@ async function urlTunelCloudflared(): Promise<string | null> {
  * 3) en desarrollo, el túnel de cloudflared activo  4) el host de la petición.
  */
 export async function urlPublica(req: Request): Promise<string> {
+  // Producción: siempre el dominio fijo (los QR impresos no deben depender del deploy).
+  if (env().NODE_ENV === "production" && process.env.VERCEL) return urlCanonica();
   const app = env().APP_URL;
   if (!esLocal(new URL(app).host)) return app;
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? new URL(req.url).host;
